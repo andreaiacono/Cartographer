@@ -1,14 +1,10 @@
-#Uncomment if you have multiple wxWidgets versions
-#import wxversion
-#wxversion.select('2.8')
-
-import math, wx
-
-from wx.glcanvas import GLCanvas
+from Image import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-from Image import *
+from wx.glcanvas import GLCanvas
+import wx
+
 
 
 class Settings(GLCanvas):
@@ -20,16 +16,20 @@ class Settings(GLCanvas):
 		self.cartographer = cartographer
 		self.posx = 0
 		self.posy = 0
+		self.posz = 0
 		self.x = 0
 		self.y = 0
+		self.z = 0
 		self.lastx = 0
 		self.lasty = 0
+		self.lastz = 0
 		self.size = None
-		#self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
 		self.Bind(wx.EVT_SIZE, self.OnSize)
 		self.Bind(wx.EVT_PAINT, self.OnPaint)
 		self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
 		self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
+		self.Bind(wx.EVT_RIGHT_DOWN, self.OnMouseDown)
+		self.Bind(wx.EVT_RIGHT_UP, self.OnMouseUp)
 		self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
 
 	
@@ -99,6 +99,7 @@ class Settings(GLCanvas):
 		glTranslatef(0.0,0.0,-5.0)
 		glRotatef(self.posy, 1.0, 0.0, 0.0);
 		glRotatef(self.posx, 0.0, 0.0, 1.0);
+		glRotatef(self.posz, 0.0, 1.0, 0.0);
 		glBindTexture(GL_TEXTURE_2D, int(self.textures[0]))
 		gluSphere(self.quadratic,1.8,32,32)
 		self.SwapBuffers()
@@ -106,21 +107,29 @@ class Settings(GLCanvas):
 	def OnMouseDown(self, evt):
 		self.CaptureMouse()
 		self.x, self.y = self.lastx, self.lasty = evt.GetPosition()
+		self.z = self.lastz = self.y
 
 	def OnMouseUp(self, evt):
 		self.ReleaseMouse()
 
 	def OnMouseMotion(self, evt):
-		if evt.Dragging() and evt.LeftIsDown():
+		if evt.Dragging() and ( evt.LeftIsDown() or evt.RightIsDown()):
 			self.x, self.y = evt.GetPosition()
-			self.posx += self.x - self.lastx
-			self.posy += self.y - self.lasty
-			self.lastx = self.x
-			self.lasty = self.y
+			
+			if evt.RightIsDown():
+				self.z = self.y
+				self.posz += self.z - self.lastz
+				self.lastz = self.z
+			else:
+				self.posx += self.x - self.lastx
+				self.posy += self.y - self.lasty
+				self.lastx = self.x
+				self.lasty = self.y
+
 			self.cartographer.centerx = self.posx
 			self.cartographer.centery = self.posy
+			self.cartographer.rotation = self.posz
 			self.cartographer.refresh()
-			print "x=" + str(self.posx) + " y=" + str(self.posy)
 			self.Refresh(False)
 
 

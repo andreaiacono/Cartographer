@@ -45,6 +45,7 @@ class CartographerFrame(wx.Frame):
 		self.SetStatusText("Ready")
 		self.centerx = 0
 		self.centery = 0
+		self.rotation = 0
 
 		splitter = wx.SplitterWindow(self, -1)
 		self.upperPanel = panel_position.Settings(splitter, self)
@@ -66,6 +67,7 @@ class CartographerFrame(wx.Frame):
 	def refresh(self):
 		self.lowerPanel.centerx = self.centerx
 		self.lowerPanel.centery = self.centery
+		self.lowerPanel.rotation = self.rotation
 		self.lowerPanel.Refresh()
 		
 		
