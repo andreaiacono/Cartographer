@@ -71,11 +71,11 @@ class CartographerFrame(wx.Frame):
 		self.projectionPanel.Refresh()
 		
 		
-	def SetMercatorProjection(self):
+	def SetMercatorProjection(self, event):
 		self.projectionPanel.projection = proj_mercator.MercatorProjection()
 		self.refresh()
 		
-	def SetAzimuthalOrtographicProjection(self):
+	def SetAzimuthalOrtographicProjection(self, event):
 		self.projectionPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
 		self.refresh()
 
