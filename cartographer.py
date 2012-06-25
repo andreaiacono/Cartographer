@@ -5,6 +5,7 @@ import proj_generic
 import proj_mercator
 import wx
 import proj_peters
+import proj_lambert
 
 class CartographerFrame(wx.Frame):
 
@@ -40,6 +41,10 @@ class CartographerFrame(wx.Frame):
 		ID_PROJ_PETERS = wx.NewId()
 		menu_proj.Append(ID_PROJ_PETERS, "&Peters", "Shows a Peters projection")
 		wx.EVT_MENU(self, ID_PROJ_PETERS, self.SetPetersProjection)
+		
+		ID_PROJ_LAMBERT = wx.NewId()
+		menu_proj.Append(ID_PROJ_LAMBERT, "&Lambert", "Shows a Lambert projection")
+		wx.EVT_MENU(self, ID_PROJ_LAMBERT, self.SetLambertProjection)
 		
 		menu_bar.Append(menu_proj, "&Projections");
 		
@@ -79,6 +84,10 @@ class CartographerFrame(wx.Frame):
 		
 	def SetPetersProjection(self, event):
 		self.projectionPanel.projection = proj_peters.PetersProjection()
+		self.refresh()
+	
+	def SetLambertProjection(self, event):
+		self.projectionPanel.projection = proj_lambert.LambertProjection()
 		self.refresh()
 		
 	def SetAzimuthalOrtographicProjection(self, event):
