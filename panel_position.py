@@ -126,9 +126,9 @@ class Settings(GLCanvas):
 				self.lastx = self.x
 				self.lasty = self.y
 
-			self.cartographer.centerx = self.posx
-			self.cartographer.centery = self.posy
-			self.cartographer.rotation = self.posz
+			self.cartographer.rotationx = self.posx % 360
+			self.cartographer.rotationy = self.posy % 360
+			self.cartographer.rotationz = self.posz % 360
 			self.cartographer.refresh()
 			self.Refresh(False)
 

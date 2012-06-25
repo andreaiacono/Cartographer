@@ -43,19 +43,19 @@ class CartographerFrame(wx.Frame):
 		self.SetMenuBar(menu_bar)
 		self.CreateStatusBar()
 		self.SetStatusText("Ready")
-		self.centerx = 0
-		self.centery = 0
-		self.rotation = 0
+		self.rotationx = 0
+		self.rotationy = 0
+		self.rotationz = 0
 
 		splitter = wx.SplitterWindow(self, -1)
-		self.upperPanel = panel_position.Settings(splitter, self)
-		self.upperPanel.SetBackgroundColour(wx.BLACK)
-		self.lowerPanel = panel_projection.Projection(splitter, -1)
-		self.lowerPanel.projection = proj_generic.GenericProjection() 
-		self.lowerPanel.projection = proj_mercator.MercatorProjection() 
-		self.lowerPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
-		self.lowerPanel.SetBackgroundColour(wx.LIGHT_GREY)
-		splitter.SplitHorizontally(self.upperPanel, self.lowerPanel)
+		self.positionPanel = panel_position.Settings(splitter, self)
+		self.positionPanel.SetBackgroundColour(wx.BLACK)
+		self.projectionPanel = panel_projection.Projection(splitter, -1)
+		self.projectionPanel.projection = proj_generic.GenericProjection() 
+		self.projectionPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
+		self.projectionPanel.projection = proj_mercator.MercatorProjection() 
+		self.projectionPanel.SetBackgroundColour(wx.LIGHT_GREY)
+		splitter.SplitHorizontally(self.positionPanel, self.projectionPanel)
 		self.Centre()
 
 	def OnInfo(self, event):
@@ -65,18 +65,18 @@ class CartographerFrame(wx.Frame):
 		self.Destroy()
 
 	def refresh(self):
-		self.lowerPanel.centerx = self.centerx
-		self.lowerPanel.centery = self.centery
-		self.lowerPanel.rotation = self.rotation
-		self.lowerPanel.Refresh()
+		self.projectionPanel.rotationx = self.rotationx
+		self.projectionPanel.rotationy = self.rotationy
+		self.projectionPanel.rotationz = self.rotationz
+		self.projectionPanel.Refresh()
 		
 		
 	def SetMercatorProjection(self):
-		self.lowerPanel.projection = proj_mercator.MercatorProjection()
+		self.projectionPanel.projection = proj_mercator.MercatorProjection()
 		self.refresh()
 		
 	def SetAzimuthalOrtographicProjection(self):
-		self.lowerPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
+		self.projectionPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
 		self.refresh()
 
 class CartographerApplication(wx.App):

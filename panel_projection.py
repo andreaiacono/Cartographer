@@ -14,9 +14,9 @@ class Projection(wx.Window):
 		wx.EVT_SIZE(self, self.OnSize)
 		self.lastWidth = 0
 		self.lastHeight = 0
-		self.centerx = 0.0
-		self.centery = 0.0
-		self.rotation = 0.0
+		self.rotationx = 0.0
+		self.rotationy = 0.0
+		self.rotationz = 0.0
 		self.projection = None
 		self.proj_width = 2000
 		self.proj_height = 2000
@@ -55,26 +55,22 @@ class Projection(wx.Window):
 		dc.DrawRectangle(0,0,self.width, self.height)
 
 		# draws meridian and parallels
-		dc.SetPen(wx.Pen("gray", 1))
-		for meridian in range (-12,13):
+		dc.SetPen(wx.Pen("light gray", 1))
+		for meridian in range (-6,6):
 			for point in range (-90,91):
-				rx = meridian * 15 * math.cos(math.radians(self.rotation)) - point * math.sin(math.radians(self.rotation))
-				ry = meridian * 15 * math.sin(math.radians(self.rotation)) + point * math.cos(math.radians(self.rotation))
-				x, y = tuple(val * self.mf for val in self.projection.get_coords(rx, self.centerx, ry, self.centery, rx, ry, self.proj_width, self.proj_height))
+				x, y = tuple(val * self.mf for val in self.projection.get_coords(meridian*30, self.rotationx, point, self.rotationy, meridian*30, point, self.proj_width, self.proj_height))
 				dc.DrawPoint(x+ self.tx, y+ self.ty)
 	
 		for parallel in range (-6,7):
 			for point in range (-180,181):
 				
-				rx = point * math.cos(math.radians(self.rotation)) - parallel*15 * math.sin(math.radians(self.rotation))
-				ry = point * math.sin(math.radians(self.rotation)) + parallel*15 * math.cos(math.radians(self.rotation))
-				x, y = tuple(val * self.mf for val in self.projection.get_coords(rx, self.centerx, ry, self.centery, rx, ry, self.proj_width, self.proj_height))
+				x, y = tuple(val * self.mf for val in self.projection.get_coords(point, self.rotationx, parallel*15, self.rotationy, point, parallel*15, self.proj_width, self.proj_height))
 				
 				# the equator parallel is in a darker grey
 				if (parallel == 0):
-					dc.SetPen(wx.Pen("dark gray", 1))
+					dc.SetPen(wx.Pen("black", 1))
 				else:
-					dc.SetPen(wx.Pen("gray", 1))
+					dc.SetPen(wx.Pen("light gray", 1))
 					
 				dc.DrawPoint(x+ self.tx, y+ self.ty)
 				
@@ -89,22 +85,24 @@ class Projection(wx.Window):
 					endIndex = len(shape.points)-1
 
 				for point in range(startIndex,endIndex):
-					coord_x1 = ((shape.points[point][0] + self.centerx) % 360 - 180) 
-					coord_y1 = ((-shape.points[point][1] + self.centery) % 180 - 90)
 					
-					coord_x2 = ((shape.points[point+1][0] + self.centerx) % 360 - 180 )
-					coord_y2 = ((-shape.points[point+1][1] + self.centery) % 180 - 90)
-					
-					rx1 = coord_x1 * math.cos(math.radians(self.rotation)) - coord_y1 * math.sin(math.radians(self.rotation))
-					ry1 = coord_x1 * math.sin(math.radians(self.rotation)) + coord_y1 * math.cos(math.radians(self.rotation))
-					rx2 = coord_x2 * math.cos(math.radians(self.rotation)) - coord_y2 * math.sin(math.radians(self.rotation))
-					ry2 = coord_x2 * math.sin(math.radians(self.rotation)) + coord_y2 * math.cos(math.radians(self.rotation))
+					rx1, ry1 = self.transform_coords(shape.points[point][1], shape.points[point][0]) 
+					rx2, ry2 = self.transform_coords(shape.points[point+1][1], shape.points[point+1][0]) 
 				
-					start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(rx1, self.centerx, ry1, self.centery, shape.points[point][0], -shape.points[point][1], self.proj_width, self.proj_height))
-					end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, self.centerx, ry2, self.centery, shape.points[point][0], -shape.points[point][1], self.proj_width, self.proj_height))
+					start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(rx1, self.rotationx, ry1, self.rotationy, shape.points[point][1], -shape.points[point][0], self.proj_width, self.proj_height))
+					end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, self.rotationx, ry2, self.rotationy, shape.points[point+1][1], -shape.points[point+1][0], self.proj_width, self.proj_height))
 					
 					if (math.fabs(start_x - end_x) < self.proj_width/4 and math.fabs(start_y - end_y) < self.proj_height/4):
 						dc.DrawLine(start_x + self.tx, start_y + self.ty, end_x + self.tx, end_y + self.ty)
 
 		dc.EndDrawing
-		print "centerx=" + str(self.centerx) + " centery=" + str(self.centery) + " rotation=" + str(self.rotation) + " width=" + str(self.width) + " height=" + str(self.height)
+		#print "rotationx=" + str(self.rotationx) + " rotationy=" + str(self.rotationy) + " rotationz=" + str(self.rotationz) + " width=" + str(self.width) + " height=" + str(self.height)
+
+	def transform_coords(self, lat, lon):
+		
+		new_lon = ((lon + self.rotationx) % 360 - 180) * math.cos(math.radians(self.rotationz)) + ((-lat + self.rotationy) % 180 - 90) * math.sin(math.radians(self.rotationz))
+		new_lat = ((lon + self.rotationx) % 360 - 180) * math.sin(math.radians(self.rotationz)) + ((-lat + self.rotationy) % 180 - 90) * math.cos(math.radians(self.rotationz))
+		return new_lon, new_lat
+	
+		
+		
