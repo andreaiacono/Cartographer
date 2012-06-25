@@ -4,6 +4,7 @@ import proj_azimuthal_orthographic
 import proj_generic
 import proj_mercator
 import wx
+import proj_peters
 
 class CartographerFrame(wx.Frame):
 
@@ -38,7 +39,10 @@ class CartographerFrame(wx.Frame):
 		
 		ID_PROJ_PETERS = wx.NewId()
 		menu_proj.Append(ID_PROJ_PETERS, "&Peters", "Shows a Peters projection")
+		wx.EVT_MENU(self, ID_PROJ_PETERS, self.SetPetersProjection)
+		
 		menu_bar.Append(menu_proj, "&Projections");
+		
 
 		self.SetMenuBar(menu_bar)
 		self.CreateStatusBar()
@@ -51,8 +55,6 @@ class CartographerFrame(wx.Frame):
 		self.positionPanel = panel_position.Settings(splitter, self)
 		self.positionPanel.SetBackgroundColour(wx.BLACK)
 		self.projectionPanel = panel_projection.Projection(splitter, -1)
-		self.projectionPanel.projection = proj_generic.GenericProjection() 
-		self.projectionPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
 		self.projectionPanel.projection = proj_mercator.MercatorProjection() 
 		self.projectionPanel.SetBackgroundColour(wx.LIGHT_GREY)
 		splitter.SplitHorizontally(self.positionPanel, self.projectionPanel)
@@ -73,6 +75,10 @@ class CartographerFrame(wx.Frame):
 		
 	def SetMercatorProjection(self, event):
 		self.projectionPanel.projection = proj_mercator.MercatorProjection()
+		self.refresh()
+		
+	def SetPetersProjection(self, event):
+		self.projectionPanel.projection = proj_peters.PetersProjection()
 		self.refresh()
 		
 	def SetAzimuthalOrtographicProjection(self, event):

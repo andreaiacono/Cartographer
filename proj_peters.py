@@ -1,9 +1,9 @@
 from proj_generic import GenericProjection
 import math
 
-class MercatorProjection(GenericProjection):
+class PetersProjection(GenericProjection):
 
 	def get_coords(self, x, centerx, y, centery, original_x, original_y, width, height):
-		y = 35*math.asinh(math.tan(math.radians(y)))
-		return x, y
+		new_y = 85 * math.sin(math.radians(y))
+		return x, new_y
 
