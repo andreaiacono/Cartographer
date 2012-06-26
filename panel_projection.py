@@ -107,7 +107,7 @@ class Projection(wx.Window):
 		dc.DrawRectangle(0, 0, self.width, self.height)
 
 		# draws meridian and parallels
-		dc.SetPen(wx.Pen("dark gray", 1))
+		dc.SetPen(wx.Pen("light gray", 1))
 		for meridian in range (-6, 6):
 			
 			self.last_lat = None
@@ -147,7 +147,7 @@ class Projection(wx.Window):
 					if (parallel == 0):
 						dc.SetPen(wx.Pen("black", 1))
 					else:
-						dc.SetPen(wx.Pen("gray", 1))
+						dc.SetPen(wx.Pen("light gray", 1))
 				
 					x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, self.proj_width, self.proj_height))
 					last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.rotationx, self.last_lon, self.rotationy, self.last_lat, self.last_lon, self.proj_width, self.proj_height))
@@ -160,7 +160,30 @@ class Projection(wx.Window):
 				self.last_lon = lon
 			
 			
+		dc.SetPen(wx.Pen("gray", 1))	
+		for tropics in (-23.5, 23.5):
+
+			self.last_lat = None
+			self.last_lon = None
+			
+			for point in range (-45, 45):
+
+				lon = point * 8
+				lat = tropics
+				lat, lon = self.transform_coords(lat, lon)
 				
+				
+				if (self.last_lat != None):
+				
+					x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, self.proj_width, self.proj_height))
+					last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.rotationx, self.last_lon, self.rotationy, self.last_lat, self.last_lon, self.proj_width, self.proj_height))
+					
+					if (math.fabs(x - last_x) < self.proj_width/2):
+						dc.DrawLine(x + self.tx, y + self.ty, last_x + self.tx, last_y + self.ty)
+				
+				
+				self.last_lat = lat
+				self.last_lon = lon
 				
 				
 		# draws the shapes of lands
