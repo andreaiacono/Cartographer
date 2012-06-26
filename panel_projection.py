@@ -1,7 +1,8 @@
+import array
+import lib.euclid
 import lib.shapefile
 import math
 import wx
-import lib.euclid
 
 
 
@@ -27,7 +28,51 @@ class Projection(wx.Window):
 		self.last_lat = None
 		self.last_lon = None
 		
-
+		
+#		self.new_lat = []
+#		self.new_lon = []
+#
+#		self.latlon_to_cartesian_x = [[0.0 for col in range(-180,180)] for row in range(-90,90)]
+#		self.latlon_to_cartesian_y = [[0.0 for col in range(-180,180)] for row in range(-90,90)]
+#		self.latlon_to_cartesian_z = [[0.0 for col in range(-180,180)] for row in range(-90,90)]
+#		
+#		for lon in range (-180, 180):
+#			for lat in range (-90, 90):
+#				
+#				self.latlon_to_cartesian_x[lat][lon] = math.cos(math.radians(lat)) * math.cos(math.radians(lon))  
+#				self.latlon_to_cartesian_y[lat][lon] = math.cos(math.radians(lat)) * math.sin(math.radians(lon))
+#				self.latlon_to_cartesian_z[lat][lon] = math.sin(math.radians(lat))
+#				
+#		print "finished lat to cart"
+#
+#		self.cartesian_to_lat = [[[0.0 for x in range(-180,180)] for y in range(-180,180)] for z in range(-180,180)] 
+#		self.cartesian_to_lon = [[[0.0 for x in range(-180,180)] for y in range(-180,180)] for z in range(-180,180)]
+#		
+#		for x in range (-180, 180):
+#			for y in range (-180, 180):
+#				for z in range (-180, 180):
+#					
+#					try:
+#						self.cartesian_to_lat[x][y][z] = math.asin(math.radians(z/float(z)))  
+#						self.cartesian_to_lon[x][y][z] = math.atan2(math.radians(y), math.radians(x))
+#					except:
+#						pass
+#		print "finished cart to lat"
+		
+#		for lat in range(-9, 9):
+#			for lon in range (-18, 18):
+#				for rx in range(-18, 18):
+#					for ry in range(-18, 18):
+#						for rz in range(-18, 18):
+#						
+#							x, y, z = self.latlong_to_cartesian(lat/float(10), lon/float(10))
+#							x, y, z = self.apply_rotation(rx*10, ry*10, rz*10, x, y, z)
+#							new_lat_tmp, new_lon_tmp = self.cartesian_to_latlong(x, y, z)
+#							self.new_lat.append(new_lat_tmp)
+#							self.new_lon.append(new_lon_tmp)
+#			print "lat=" + str(lat)
+				
+		
 	def OnPaint(self, event):
 		dc = wx.PaintDC(self)
 		self.drawProjection(dc)
@@ -62,15 +107,15 @@ class Projection(wx.Window):
 		dc.DrawRectangle(0, 0, self.width, self.height)
 
 		# draws meridian and parallels
-		dc.SetPen(wx.Pen("gray", 1))
+		dc.SetPen(wx.Pen("dark gray", 1))
 		for meridian in range (-6, 6):
 			
 			self.last_lat = None
 			self.last_lon = None
 			
-			for point in range (-90, 91):
-				lon = meridian * 30
-				lat = point
+			for point in range (-45, 45):
+				lon = meridian * 15
+				lat = point * 4
 				lat, lon = self.transform_coords(lat, lon)
 				
 				if (self.last_lat != None):
@@ -89,9 +134,9 @@ class Projection(wx.Window):
 			self.last_lat = None
 			self.last_lon = None
 			
-			for point in range (-179, 181):
+			for point in range (-45, 45):
 
-				lon = point
+				lon = point * 8
 				lat = parallel*15
 				lat, lon = self.transform_coords(lat, lon)
 				
@@ -143,12 +188,22 @@ class Projection(wx.Window):
 		
 	def transform_coords(self, lat, lon):
 		
+		
 		x, y, z = self.latlong_to_cartesian(lat, lon)
+#		x = self.latlon_to_cartesian_x[int(lat)][int(lon)]
+#		y = self.latlon_to_cartesian_y[int(lat)][int(lon)]
+#		z = self.latlon_to_cartesian_z[int(lat)][int(lon)]
+		
 		x, y, z = self.apply_rotation(self.rotationx, self.rotationy, self.rotationz, x, y, z)
+		
 		new_lat, new_lon = self.cartesian_to_latlong(x, y, z)
+		
+#		new_lat = self.cartesian_to_lat[int(x)][int(y)][int(z)]
+#		new_lon = self.cartesian_to_lon[int(x)][int(y)][int(z)]
 		
 		#print "old=(" + str(lat) + "," + str(lon) + " new=(" + str(new_lat) + "," + str(new_lon) + ")"
 		
+		#return math.degrees(-self.new_lon[int(lon/10)]), math.degrees(-self.new_lat[int(lat/10)])*80
 		return math.degrees(-new_lon), math.degrees(-new_lat)*80
 	
 	

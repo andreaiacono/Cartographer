@@ -121,7 +121,7 @@ class Settings(GLCanvas):
 				self.posz += self.z - self.lastz
 				self.lastz = self.z
 			else:
-				self.posx += self.x - self.lastx
+				self.posx -= self.x - self.lastx
 				self.posy += self.y - self.lasty
 				self.lastx = self.x
 				self.lasty = self.y

@@ -1,7 +1,6 @@
 import panel_position
 import panel_projection
 import proj_azimuthal_orthographic
-import proj_generic
 import proj_mercator
 import wx
 import proj_peters
@@ -12,7 +11,7 @@ class CartographerFrame(wx.Frame):
 
 	
 	def __init__(self):
-		wx.Frame.__init__(self, None, -1, "Cartographer")
+		wx.Frame.__init__(self, None, -1, "Cartographer", wx.DefaultPosition, wx.Size(800,600))
 		wx.EVT_CLOSE(self, self.OnQuit)
 		menu_file = wx.Menu()
 		
@@ -53,10 +52,12 @@ class CartographerFrame(wx.Frame):
 		self.CreateStatusBar()
 		self.SetStatusText("Ready")
 		self.rotationx = 0
-		self.rotationy = 0
+		self.rotationy = 180
 		self.rotationz = 0
 
 		splitter = wx.SplitterWindow(self, -1)
+		splitter.SetSashPosition(50, True)
+		splitter.SetSashSize(10)
 		self.positionPanel = panel_position.Settings(splitter, self)
 		self.positionPanel.SetBackgroundColour(wx.BLACK)
 		self.projectionPanel = panel_projection.Projection(splitter, -1)
