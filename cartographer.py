@@ -1,6 +1,5 @@
 import panel_position
 import panel_projection
-import panel_settings
 import proj_azimuthal_orthographic
 import proj_lambert
 import proj_mercator
