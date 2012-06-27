@@ -1,10 +1,12 @@
 import panel_position
 import panel_projection
+import panel_settings
 import proj_azimuthal_orthographic
-import proj_mercator
-import wx
-import proj_peters
 import proj_lambert
+import proj_mercator
+import proj_peters
+import wx
+import panel_configuration
 
 class CartographerFrame(wx.Frame):
 
@@ -55,19 +57,27 @@ class CartographerFrame(wx.Frame):
 		self.rotationy = 180
 		self.rotationz = 0
 
-		splitter = wx.SplitterWindow(self, -1)
-		splitter.SetSashPosition(50, True)
-		splitter.SetSashSize(10)
-		self.positionPanel = panel_position.Settings(splitter, self)
-		self.positionPanel.SetBackgroundColour(wx.BLACK)
-		self.projectionPanel = panel_projection.Projection(splitter, -1)
-		self.projectionPanel.projection = proj_mercator.MercatorProjection() 
-		self.projectionPanel.SetBackgroundColour(wx.LIGHT_GREY)
-		splitter.SplitHorizontally(self.positionPanel, self.projectionPanel)
-		self.Centre()
+		top_splitter = wx.SplitterWindow(self)
+		settings_splitter = wx.SplitterWindow(top_splitter)
+		
+		self.configurationPanel = panel_configuration.ConfigurationPanel(settings_splitter, -1)
+		self.positionCanvas = panel_position.PositionCanvas(settings_splitter, self)
+		settings_splitter.SplitVertically(self.positionCanvas, self.configurationPanel)
+		settings_splitter.SetSashGravity(0.5)
+
+		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1)
+		self.projectionPanel.projection = proj_lambert.LambertProjection() 
+		top_splitter.SplitHorizontally(settings_splitter, self.projectionPanel)
+		top_splitter.SetSashGravity(0.3)
+		
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(top_splitter, 1, wx.EXPAND)
+		self.SetSizer(sizer)
+		
+		
 
 	def OnInfo(self, event):
-		wx.MessageBox("Cartographer \n\nwritten \n\nby Andrea Iacono")
+		wx.MessageBox("Cartographer \n\nwritten \n\nby Andrea Iacono\n\nandrea.iacono@gmail.com")
 
 	def OnQuit(self, event):
 		self.Destroy()
@@ -96,6 +106,7 @@ class CartographerFrame(wx.Frame):
 		self.refresh()
 
 class CartographerApplication(wx.App):
+	
 	def OnInit(self):
 		frame = CartographerFrame()
 		frame.Show(True)

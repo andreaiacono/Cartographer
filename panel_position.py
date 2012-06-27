@@ -7,7 +7,7 @@ import wx
 
 
 
-class Settings(GLCanvas):
+class PositionCanvas(GLCanvas):
 
 	def __init__(self, parent, cartographer):
 		GLCanvas.__init__(self, parent, -1)
@@ -138,7 +138,7 @@ if __name__ == '__main__':
 
 	app = wx.App()
 	frame = wx.Frame(None, -1, 'test', wx.DefaultPosition, wx.Size(400,400))
-	panel = Settings(frame, None)
+	panel = PositionCanvas(frame, None)
 
 	frame.Show()
 	app.MainLoop()
