@@ -8,12 +8,21 @@ import wx
 
 class ProjectionPanel(wx.Panel):
 
+
+	
 	def __init__(self, parent, window_id):
 		sty = wx.NO_BORDER
 		wx.Window.__init__(self, parent, window_id, style=sty)
 		self.parent = parent
-		shapeReader = lib.shapefile.Reader("shapes/110m_land.shp")
-		self.shapes = shapeReader.shapes()
+		
+		countriesShapeReader = lib.shapefile.Reader("shapes/ne_110m_admin_0_countries.shp")
+		self.countries = countriesShapeReader.shapes()
+		
+		continentsShapeReader = lib.shapefile.Reader("shapes/110m_land.shp")
+		self.continents = continentsShapeReader.shapes()
+		
+		self.set_shapes(0)
+		
 		wx.EVT_PAINT(self, self.OnPaint)
 		wx.EVT_SIZE(self, self.OnSize)
 		self.lastWidth = 0
@@ -26,7 +35,12 @@ class ProjectionPanel(wx.Panel):
 		self.proj_height = 2000
 		self.last_lat = None
 		self.last_lon = None
-		self.resolution = 15
+		
+		self.set_resolution(15)
+		self.set_grid_resolution(10)
+		self.set_paint_grid(True)
+		self.set_paint_grid_specials(True)
+		
 		
 		
 #		self.new_lat = []
@@ -71,7 +85,25 @@ class ProjectionPanel(wx.Panel):
 #							self.new_lat.append(new_lat_tmp)
 #							self.new_lon.append(new_lon_tmp)
 #			print "lat=" + str(lat)
-				
+			
+	def set_paint_grid_specials(self, paint_grid_specials):
+		self.paint_grid_specials = paint_grid_specials
+	
+	def set_paint_grid(self, paint_grid):
+		self.paint_grid = paint_grid
+	
+	def set_resolution(self, resolution):		
+		self.resolution = resolution
+
+	def set_grid_resolution(self, grid_resolution):		
+		self.grid_resolution = grid_resolution
+		
+	def set_shapes(self, shape_type):
+		if shape_type == 0:
+			self.shapes = self.continents
+		elif shape_type == 1:
+			self.shapes = self.countries
+
 		
 	def OnPaint(self, event):
 		dc = wx.PaintDC(self)
@@ -106,10 +138,10 @@ class ProjectionPanel(wx.Panel):
 		last_lat = None
 		last_lon = None
 
-		for point in range (-45, 45):
+		for point in range (-30, 30):
 	
-			if (point % self.resolution == 0):
-				lon = point * 8
+			if (point % self.grid_resolution == 0):
+				lon = point * 12
 				lat, lon = self.transform_coords(latitude, lon)
 				
 				if (last_lat != None):
@@ -130,45 +162,46 @@ class ProjectionPanel(wx.Panel):
 		dc.DrawRectangle(0, 0, self.width, self.height)
 
 		# draws meridian and parallels
-		dc.SetPen(wx.Pen("light gray", 1))
-		for meridian in range (-6, 6):
+		if (self.paint_grid):
 			
-			self.last_lat = None
-			self.last_lon = None
-			
-			for point in range (-45, 45):
+			dc.SetPen(wx.Pen("light gray", 1))
+			for meridian in range (-6, 6):
 				
-				if (point % self.resolution == 0):
-					lon = meridian * 15
-					lat = point * 4
-					lat, lon = self.transform_coords(lat, lon)
+				self.last_lat = None
+				self.last_lon = None
+				
+				for point in range (-30, 30):
 					
-					if (self.last_lat != None):
-						x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, self.proj_width, self.proj_height))
-						last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.rotationx, self.last_lon, self.rotationy, self.last_lat, self.last_lon, self.proj_width, self.proj_height))
+					if (point % self.grid_resolution == 0):
+						lon = meridian * 15
+						lat = point * 6
+						lat, lon = self.transform_coords(lat, lon)
 						
-						if (math.fabs(y - last_y) < self.proj_height/2 and math.fabs(x - last_x) < self.proj_width/2):
-							dc.DrawLine(x + self.tx, y + self.ty, last_x + self.tx, last_y + self.ty)
-					
-					self.last_lat = lat
-					self.last_lon = lon
+						if (self.last_lat != None):
+							x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, self.proj_width, self.proj_height))
+							last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.rotationx, self.last_lon, self.rotationy, self.last_lat, self.last_lon, self.proj_width, self.proj_height))
+							
+							if (math.fabs(y - last_y) < self.proj_height/2 and math.fabs(x - last_x) < self.proj_width/2):
+								dc.DrawLine(x + self.tx, y + self.ty, last_x + self.tx, last_y + self.ty)
+						
+						self.last_lat = lat
+						self.last_lon = lon
+
 	
+		if (self.paint_grid):
+			dc.SetPen(wx.Pen("light gray", 1))
+			for parallel in range (-6, 7):
+				
+				self.drawParallel(parallel*15, dc)
+			
+		if (self.paint_grid_specials):
+			dc.SetPen(wx.Pen("gray", 1))
+			for tropics in (-23.5, 23.5):
 	
-		for parallel in range (-6, 7):
+				self.drawParallel(tropics, dc)
 
-			# the equator parallel is in a darker grey
-			if (parallel == 0):
-				dc.SetPen(wx.Pen("black", 1))
-			else:
-				dc.SetPen(wx.Pen("light gray", 1))
-
-			self.drawParallel(parallel*15, dc)
-			
-			
-		dc.SetPen(wx.Pen("gray", 1))	
-		for tropics in (-23.5, 23.5):
-
-			self.drawParallel(tropics, dc)
+			dc.SetPen(wx.Pen("black", 1))
+			self.drawParallel(0, dc)
 				
 				
 		# draws the shapes of lands
