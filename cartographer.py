@@ -7,7 +7,7 @@ import proj_lambert_configuration
 import proj_mercator
 import proj_mercator_configuration
 import proj_peters
-import settings_window
+import options_window
 import wx
 
 
@@ -16,7 +16,7 @@ class CartographerFrame(wx.Frame):
 
 	
 	def __init__(self):
-		wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer", pos=wx.DefaultPosition, size=wx.Size(160,60))
+		wx.Frame.__init__(self, parent=None, id= -1, title="Cartographer", pos=wx.DefaultPosition, size=wx.Size(320, 200))
 		wx.EVT_CLOSE(self, self.OnQuit)
 		wx.EVT_KEY_DOWN(self, self.OnKeyDown)
 		
@@ -95,11 +95,11 @@ class CartographerFrame(wx.Frame):
 		self.settings_splitter = wx.SplitterWindow(top_splitter)
 		
 		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1)
-		self.projectionPanel.projection = proj_mercator.MercatorProjection() 
+		self.projectionPanel.projection = proj_lambert.LambertProjection() 
 		top_splitter.SplitHorizontally(self.settings_splitter, self.projectionPanel)
 		top_splitter.SetSashGravity(0.3)
 		
-		self.configurationPanel = proj_mercator_configuration.ConfigurationPanel(self.settings_splitter, -1)
+		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self)
 		self.positionCanvas = panel_position.PositionCanvas(self.settings_splitter, self)
 		self.settings_splitter.SplitVertically(self.positionCanvas, self.configurationPanel)
 		self.settings_splitter.SetSashGravity(0.5)
@@ -108,42 +108,41 @@ class CartographerFrame(wx.Frame):
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(top_splitter, 1, wx.EXPAND)
 		self.SetSizer(sizer)
-		
+		self.options = None
 		
 	def OnOptions(self, event):
-		settings = settings_window.Settings(None, self)
-		settings.Show(True)
+		self.options = options_window.Options(None, self)
+		self.options.Show(True)
 
 	def OnQuit(self, event):
-		self.Destroy()
-
-	def OnExport(self, event):
+		#if self.options != None:
+		#	self.options.Destroy()
 		self.Destroy()
 
 	def OnKeyDown(self, event):
 		key = event.GetKeyCode()
 		if key == wx.WXK_LEFT or key == wx.WXK_NUMPAD_LEFT:
-			self.rotationx -=5
+			self.rotationx -= 5
 			self.projectionPanel.rotationx = self.rotationx
 			self.projectionPanel.Refresh()
 		elif key == wx.WXK_RIGHT or key == wx.WXK_NUMPAD_RIGHT:
-			self.rotationx +=5
+			self.rotationx += 5
 			self.projectionPanel.rotationx = self.rotationx
 			self.projectionPanel.Refresh()
 		elif key == wx.WXK_UP or key == wx.WXK_NUMPAD_UP:
-			self.rotationy -=5
+			self.rotationy -= 5
 			self.projectionPanel.rotationy = self.rotationy
 			self.projectionPanel.Refresh()
 		elif key == wx.WXK_DOWN or key == wx.WXK_NUMPAD_DOWN:
-			self.rotationy +=5
+			self.rotationy += 5
 			self.projectionPanel.rotationy = self.rotationy
 			self.projectionPanel.Refresh()
 		elif key == wx.WXK_PAGEUP or key == wx.WXK_NUMPAD_PAGEUP:
-			self.rotationz -=5
+			self.rotationz -= 5
 			self.projectionPanel.rotationz = self.rotationz
 			self.projectionPanel.Refresh()
 		elif key == wx.WXK_PAGEDOWN or key == wx.WXK_NUMPAD_PAGEDOWN:
-			self.rotationz +=5
+			self.rotationz += 5
 			self.projectionPanel.rotationz = self.rotationz
 			self.projectionPanel.Refresh()
 				
@@ -168,7 +167,7 @@ class CartographerFrame(wx.Frame):
 	
 	def SetLambertProjection(self, event):
 		self.projectionPanel.projection = proj_lambert.LambertProjection()
-		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1)
+		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, self)
 		self.SetTitle("Cartographer - Lambert Projection")
 		self.refresh()
 		
@@ -178,6 +177,41 @@ class CartographerFrame(wx.Frame):
 		self.SetTitle("Cartographer - Azimuthal Ortographic Projection")
 		self.refresh()
 
+	def OnExport(self, event) :
+	 	
+#	 	dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir = "", defaultFile = "", wildcard = "*.png", style = wx.SAVE)
+#	 	if dlg.ShowModal() != wx.ID_OK:
+#	 		return
+	 	height = 2000
+	 	width = 4000
+		mem = wx.MemoryDC() 
+	 	image = wx.EmptyBitmap(width, height) 
+		mem.SelectObject(image)
+		mem.BeginDrawing() 
+
+		okno = panel_projection.ProjectionPanel(self, -1)
+		okno.projection = self.projectionPanel.projection
+		okno.set_shapes(2)
+		okno.resolution = 1
+		okno.grid_resolution = 1
+		okno.set_paint_grid(self.projectionPanel.paint_grid)
+		okno.set_paint_grid_specials(self.projectionPanel.paint_grid_specials)
+		okno.rotationx = self.projectionPanel.rotationx
+		okno.rotationy = self.projectionPanel.rotationy
+		okno.rotationz = self.projectionPanel.rotationz
+		okno.width = width
+		okno.height = height
+		okno.mf = height / float(180)
+		okno.tx = okno.mf * 180 + (width - okno.mf * 360) / 2
+		okno.ty = okno.mf * 90
+		okno.drawProjection(mem, width, height)
+
+		mem.Blit(0, 0, 2000, 1000, wx.PaintDC(okno), 0, 0) 
+		mem.EndDrawing() 
+		
+		image.SaveFile("/home/andrea/test.png" , wx.BITMAP_TYPE_PNG) 
+  		okno.Destroy(
+					)
 	def OnInfo(self, event):
 
 		description = """Cartographer is a simple cartography application"""

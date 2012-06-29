@@ -21,6 +21,9 @@ class ProjectionPanel(wx.Panel):
 		continentsShapeReader = lib.shapefile.Reader("shapes/110m_land.shp")
 		self.continents = continentsShapeReader.shapes()
 		
+		hiResShapeReader = lib.shapefile.Reader("shapes/10m_land.shp")
+		self.hires = hiResShapeReader.shapes()
+		
 		self.set_shapes(0)
 		
 		wx.EVT_PAINT(self, self.OnPaint)
@@ -36,7 +39,7 @@ class ProjectionPanel(wx.Panel):
 		self.last_lat = None
 		self.last_lon = None
 		
-		self.set_resolution(15)
+		self.set_resolution(20)
 		self.set_grid_resolution(10)
 		self.set_paint_grid(True)
 		self.set_paint_grid_specials(True)
@@ -99,15 +102,21 @@ class ProjectionPanel(wx.Panel):
 		self.grid_resolution = grid_resolution
 		
 	def set_shapes(self, shape_type):
+		
+		self.shape_type = shape_type
+		
 		if shape_type == 0:
 			self.shapes = self.continents
 		elif shape_type == 1:
 			self.shapes = self.countries
+		else:
+			self.shapes = self.hires
 
 		
 	def OnPaint(self, event):
 		dc = wx.PaintDC(self)
-		self.drawProjection(dc)
+		self.width, self.height = self.GetSizeTuple()
+		self.drawProjection(dc, self.width, self.height)
 
 
 	def OnSize(self, event):
@@ -127,39 +136,39 @@ class ProjectionPanel(wx.Panel):
 				self.proj_width = self.width
 				self.proj_height = self.height - self.mf * 180
 			dc = wx.PaintDC(self)
-			self.drawProjection(dc)
+			self.drawProjection(dc, self.width, self.height)
 			
 		self.lastWidth = self.width
 		self.lastHeight = self.height
 
 
-	def drawParallel(self, latitude, dc):
+	def drawParallel(self, latitude, width, height, dc):
 		
 		last_lat = None
 		last_lon = None
 
-		for point in range (-30, 30):
+		for point in range (-180, 180):
 	
 			if (point % self.grid_resolution == 0):
-				lon = point * 12
+				lon = point * 2
 				lat, lon = self.transform_coords(latitude, lon)
 				
 				if (last_lat != None):
 	
-					x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, self.proj_width, self.proj_height))
-					last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(last_lat, self.rotationx, last_lon, self.rotationy, last_lat, last_lon, self.proj_width, self.proj_height))
+					x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, width, height))
+					last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(last_lat, self.rotationx, last_lon, self.rotationy, last_lat, last_lon, width, height))
 					
-					if (math.fabs(x - last_x) < self.proj_width/2):
+					if (math.fabs(x - last_x) < width/2):
 						dc.DrawLine(x + self.tx, y + self.ty, last_x + self.tx, last_y + self.ty)
 								
 				last_lat = lat
 				last_lon = lon
 
 
-	def drawProjection(self, dc):
+	def drawProjection(self, dc, width, height):
 		dc.BeginDrawing()
 		dc.SetBrush(wx.WHITE_BRUSH)
-		dc.DrawRectangle(0, 0, self.width, self.height)
+		dc.DrawRectangle(0, 0, width, height)
 
 		# draws meridian and parallels
 		if (self.paint_grid):
@@ -170,18 +179,18 @@ class ProjectionPanel(wx.Panel):
 				self.last_lat = None
 				self.last_lon = None
 				
-				for point in range (-30, 30):
+				for point in range (-180, 180):
 					
 					if (point % self.grid_resolution == 0):
 						lon = meridian * 15
-						lat = point * 6
+						lat = point 
 						lat, lon = self.transform_coords(lat, lon)
 						
 						if (self.last_lat != None):
-							x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, self.proj_width, self.proj_height))
-							last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.rotationx, self.last_lon, self.rotationy, self.last_lat, self.last_lon, self.proj_width, self.proj_height))
+							x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, self.rotationx, lon, self.rotationy, lat, lon, width, height))
+							last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.rotationx, self.last_lon, self.rotationy, self.last_lat, self.last_lon, width, height))
 							
-							if (math.fabs(y - last_y) < self.proj_height/2 and math.fabs(x - last_x) < self.proj_width/2):
+							if (math.fabs(y - last_y) < height/10 and math.fabs(x - last_x) < width/10):
 								dc.DrawLine(x + self.tx, y + self.ty, last_x + self.tx, last_y + self.ty)
 						
 						self.last_lat = lat
@@ -192,16 +201,16 @@ class ProjectionPanel(wx.Panel):
 			dc.SetPen(wx.Pen("light gray", 1))
 			for parallel in range (-6, 7):
 				
-				self.drawParallel(parallel*15, dc)
+				self.drawParallel(parallel*15, width, height,dc)
 			
 		if (self.paint_grid_specials):
 			dc.SetPen(wx.Pen("gray", 1))
 			for tropics in (-23.5, 23.5):
 	
-				self.drawParallel(tropics, dc)
+				self.drawParallel(tropics, width, height, dc)
 
 			dc.SetPen(wx.Pen("black", 1))
-			self.drawParallel(0, dc)
+			self.drawParallel(0, width, height, dc)
 				
 				
 		# draws the shapes of lands
@@ -215,16 +224,16 @@ class ProjectionPanel(wx.Panel):
 					endIndex = len(shape.points) - 1
 
 				rx1, ry1 = self.transform_coords(shape.points[startIndex][1], -shape.points[startIndex][0])
-				start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(rx1, self.rotationx, ry1, self.rotationy, shape.points[startIndex][1], shape.points[startIndex][0], self.proj_width, self.proj_height))
+				start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(rx1, self.rotationx, ry1, self.rotationy, shape.points[startIndex][1], shape.points[startIndex][0], width, height))
 				
 				for point in range(startIndex+1, endIndex):
 					
 					if (point % self.resolution == 0):
 						
 						rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0]) 
-						end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, self.rotationx, ry2, self.rotationy, shape.points[point + 1][1], shape.points[point + 1][0], self.proj_width, self.proj_height))
+						end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, self.rotationx, ry2, self.rotationy, shape.points[point + 1][1], shape.points[point + 1][0], width, height))
 					
-						if (math.fabs(start_x - end_x) < self.proj_width / 4 and math.fabs(start_y - end_y) < self.proj_height / 4):
+						if (math.fabs(start_x - end_x) < width / 10 and math.fabs(start_y - end_y) < height / 10):
 							dc.DrawLine(start_x + self.tx, start_y + self.ty, end_x + self.tx, end_y + self.ty)
 							
 						start_x, start_y = end_x, end_y
