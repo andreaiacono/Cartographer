@@ -206,14 +206,13 @@ class ProjectionPanel(wx.Panel):
 				self.drawParallel(parallel*15, width, height,dc)
 			
 		if (self.paint_grid_specials):
-			dc.SetPen(wx.Pen("gray", 1))
+			dc.SetPen(wx.Pen("dark gray", 1))
 			for tropics in (-23.5, 23.5):
 	
 				self.drawParallel(tropics, width, height, dc)
 
 			dc.SetPen(wx.Pen("black", 1))
 			self.drawParallel(0, width, height, dc)
-				
 				
 		# draws the shapes of lands
 		dc.SetPen(wx.Pen("blue", 1))		
@@ -240,6 +239,7 @@ class ProjectionPanel(wx.Panel):
 							
 						start_x, start_y = end_x, end_y
 						
+		dc.FloodFill(width/2, height/2, wx.GREEN)
 		dc.EndDrawing
 		
 	def transform_coords(self, lat, lon):

@@ -10,6 +10,7 @@ import proj_peters
 import options_window
 import wx
 import proj_sinusoidal
+import proj_eckertIV
 
 
 class CartographerFrame(wx.Frame):
@@ -58,6 +59,10 @@ class CartographerFrame(wx.Frame):
 		menu_pseudocyl.Append(ID_PROJ_SINUSOIDAL, "&Sinusoidal", "Shows a sinusoidal projection")
 		wx.EVT_MENU(self, ID_PROJ_SINUSOIDAL, self.SetSinusoidalProjection)
 
+		ID_PROJ_ECKERTIV = wx.NewId()
+		menu_pseudocyl.Append(ID_PROJ_ECKERTIV, "&Eckert IV", "Shows an Eckert IV projection")
+		wx.EVT_MENU(self, ID_PROJ_ECKERTIV, self.SetEckertIVProjection)
+
 
 		menu_conic = wx.Menu()		
 		menu_proj.AppendMenu(wx.ID_ANY, "C&onic Projections", menu_conic)
@@ -103,11 +108,11 @@ class CartographerFrame(wx.Frame):
 		self.settings_splitter = wx.SplitterWindow(top_splitter)
 		
 		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1)
-		self.projectionPanel.projection = proj_lambert.LambertProjection() 
+		self.projectionPanel.projection = proj_mercator.MercatorProjection()
 		top_splitter.SplitHorizontally(self.settings_splitter, self.projectionPanel)
 		top_splitter.SetSashGravity(0.3)
 		
-		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self)
+		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Mercator")
 		self.positionCanvas = panel_position.PositionCanvas(self.settings_splitter, self)
 		self.settings_splitter.SplitVertically(self.positionCanvas, self.configurationPanel)
 		self.settings_splitter.SetSashGravity(0.5)
@@ -191,6 +196,12 @@ class CartographerFrame(wx.Frame):
 		self.SetTitle("Cartographer - Sinusoidal Projection")
 		self.refresh()
 
+	def SetEckertIVProjection(self, event):
+		self.projectionPanel.projection = proj_eckertIV.EckertIVProjection()
+		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Eckert IV projection")
+		self.SetTitle("Cartographer - Eckert IV Projection")
+		self.refresh()
+		
 	def OnExport(self, event) :
 	 	
 #	 	dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir = "", defaultFile = "", wildcard = "*.png", style = wx.SAVE)
