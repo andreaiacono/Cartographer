@@ -39,7 +39,9 @@ class ProjectionPanel(wx.Panel):
 		self.last_lat = None
 		self.last_lon = None
 		
-		self.set_resolution(20)
+		self.resolution_scale = 15
+
+		self.set_resolution(self.resolution_scale/2)
 		self.set_grid_resolution(10)
 		self.set_paint_grid(True)
 		self.set_paint_grid_specials(True)
@@ -149,7 +151,7 @@ class ProjectionPanel(wx.Panel):
 
 		for point in range (-180, 180):
 	
-			if (point % self.grid_resolution == 0):
+			if (point % self.resolution_scale >= self.grid_resolution-1):
 				lon = point * 2
 				lat, lon = self.transform_coords(latitude, lon)
 				
@@ -181,7 +183,7 @@ class ProjectionPanel(wx.Panel):
 				
 				for point in range (-180, 180):
 					
-					if (point % self.grid_resolution == 0):
+					if (point % self.resolution_scale >= self.grid_resolution-1):
 						lon = meridian * 15
 						lat = point 
 						lat, lon = self.transform_coords(lat, lon)
@@ -228,7 +230,7 @@ class ProjectionPanel(wx.Panel):
 				
 				for point in range(startIndex+1, endIndex):
 					
-					if (point % self.resolution == 0):
+					if (point % self.resolution_scale >= self.resolution-1):
 						
 						rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0]) 
 						end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, self.rotationx, ry2, self.rotationy, shape.points[point + 1][1], shape.points[point + 1][0], width, height))

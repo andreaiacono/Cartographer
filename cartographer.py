@@ -167,7 +167,7 @@ class CartographerFrame(wx.Frame):
 	
 	def SetLambertProjection(self, event):
 		self.projectionPanel.projection = proj_lambert.LambertProjection()
-		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, self)
+		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self)
 		self.SetTitle("Cartographer - Lambert Projection")
 		self.refresh()
 		

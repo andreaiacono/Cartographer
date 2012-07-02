@@ -15,8 +15,8 @@ class Options(wx.Frame):
 		empty_label = wx.StaticText(panel, label="")
 		label_grid_res = wx.StaticText(panel, label="Grid Resolution")
 		
-		self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=20, style=wx.SL_HORIZONTAL)
-		self.slider_grid_res = wx.Slider(panel, minValue=1, maxValue=20, style=wx.SL_HORIZONTAL)
+		self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projectionPanel.resolution_scale, style=wx.SL_HORIZONTAL)
+		self.slider_grid_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projectionPanel.resolution_scale, style=wx.SL_HORIZONTAL)
 		self.slider_proj_res.SetValue(cartographer.projectionPanel.resolution)
 		self.slider_grid_res.SetValue(cartographer.projectionPanel.grid_resolution)
 		 
