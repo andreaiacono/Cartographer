@@ -238,8 +238,7 @@ class ProjectionPanel(wx.Panel):
 							dc.DrawLine(start_x + self.tx, start_y + self.ty, end_x + self.tx, end_y + self.ty)
 							
 						start_x, start_y = end_x, end_y
-						
-		dc.FloodFill(width/2, height/2, wx.GREEN)
+				
 		dc.EndDrawing
 		
 	def transform_coords(self, lat, lon):

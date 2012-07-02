@@ -11,6 +11,7 @@ import options_window
 import wx
 import proj_sinusoidal
 import proj_eckertIV
+import proj_collignon
 
 
 class CartographerFrame(wx.Frame):
@@ -62,6 +63,10 @@ class CartographerFrame(wx.Frame):
 		ID_PROJ_ECKERTIV = wx.NewId()
 		menu_pseudocyl.Append(ID_PROJ_ECKERTIV, "&Eckert IV", "Shows an Eckert IV projection")
 		wx.EVT_MENU(self, ID_PROJ_ECKERTIV, self.SetEckertIVProjection)
+
+		ID_PROJ_COLLIGNON = wx.NewId()
+		menu_pseudocyl.Append(ID_PROJ_COLLIGNON, "&Collignon", "Shows a Collignon projection")
+		wx.EVT_MENU(self, ID_PROJ_COLLIGNON, self.SetCollignonProjection)
 
 
 		menu_conic = wx.Menu()		
@@ -202,6 +207,11 @@ class CartographerFrame(wx.Frame):
 		self.SetTitle("Cartographer - Eckert IV Projection")
 		self.refresh()
 		
+	def SetCollignonProjection(self, event):
+		self.projectionPanel.projection = proj_collignon.CollignonProjection()
+		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Collignon projection")
+		self.SetTitle("Cartographer - Collignon Projection")
+		self.refresh()
 	def OnExport(self, event) :
 	 	
 #	 	dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir = "", defaultFile = "", wildcard = "*.png", style = wx.SAVE)
