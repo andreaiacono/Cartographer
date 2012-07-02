@@ -9,6 +9,7 @@ import proj_mercator_configuration
 import proj_peters
 import options_window
 import wx
+import proj_sinusoidal
 
 
 class CartographerFrame(wx.Frame):
@@ -50,6 +51,13 @@ class CartographerFrame(wx.Frame):
 		menu_cylindrical.Append(ID_PROJ_PETERS, "&Peters", "Shows a Peters projection")
 		wx.EVT_MENU(self, ID_PROJ_PETERS, self.SetPetersProjection)
 		
+		menu_pseudocyl = wx.Menu()		
+		menu_proj.AppendMenu(wx.ID_ANY, "P&seudo Cylindrical Projections", menu_pseudocyl)
+		
+		ID_PROJ_SINUSOIDAL = wx.NewId()
+		menu_pseudocyl.Append(ID_PROJ_SINUSOIDAL, "&Sinusoidal", "Shows a sinusoidal projection")
+		wx.EVT_MENU(self, ID_PROJ_SINUSOIDAL, self.SetSinusoidalProjection)
+
 
 		menu_conic = wx.Menu()		
 		menu_proj.AppendMenu(wx.ID_ANY, "C&onic Projections", menu_conic)
@@ -175,6 +183,12 @@ class CartographerFrame(wx.Frame):
 		self.projectionPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
 		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Azimuthal ortographic projection")
 		self.SetTitle("Cartographer - Azimuthal Ortographic Projection")
+		self.refresh()
+
+	def SetSinusoidalProjection(self, event):
+		self.projectionPanel.projection = proj_sinusoidal.SinusoidalProjection()
+		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Sinusoidal ortographic projection")
+		self.SetTitle("Cartographer - Sinusoidal Projection")
 		self.refresh()
 
 	def OnExport(self, event) :
