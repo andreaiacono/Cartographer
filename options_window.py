@@ -3,7 +3,7 @@ import wx
 class Options(wx.Frame):
 
 	def __init__(self, parent, cartographer):
-		super(Options, self).__init__(parent, title="Options", size=(300, 180))
+		super(Options, self).__init__(parent, title="Options", size=(300, 210))
 		self.cartographer = cartographer
 		panel = wx.Panel(self)
 		
@@ -21,10 +21,12 @@ class Options(wx.Frame):
 		self.slider_grid_res.SetValue(cartographer.projectionPanel.grid_resolution)
 		 
 
+		self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame') 
 		self.check_draw_grid = wx.CheckBox(panel, label='Draw Grid') 
 		self.check_draw_specials = wx.CheckBox(panel, label='Draw Special Parallels') 
 		self.check_show_countries = wx.CheckBox(panel, label='Draw Countries Borders')
 		
+		self.check_draw_frame.SetValue(cartographer.projectionPanel.paint_frame)
 		self.check_draw_grid.SetValue(cartographer.projectionPanel.paint_grid)
 		self.check_draw_specials.SetValue(cartographer.projectionPanel.paint_grid_specials)
 		self.check_show_countries.SetValue(cartographer.projectionPanel.shape_type == 1)
@@ -33,6 +35,7 @@ class Options(wx.Frame):
 		self.Bind(wx.EVT_CHECKBOX, self.on_update)
 		
 		fgs.AddMany([(label_res), (self.slider_proj_res, 1, wx.EXPAND),
+					 (self.check_draw_frame, 1, wx.EXPAND), (empty_label), 
 					 (self.check_draw_grid, 1, wx.EXPAND), (empty_label), 
 					 (label_grid_res, 1, wx.EXPAND), (self.slider_grid_res, 1, wx.EXPAND),
 					 (self.check_draw_specials, 1, wx.EXPAND), (empty_label),
@@ -46,6 +49,7 @@ class Options(wx.Frame):
 	def on_update(self, event):
 		self.cartographer.projectionPanel.set_resolution(self.slider_proj_res.GetValue())
 		self.cartographer.projectionPanel.set_grid_resolution(self.slider_grid_res.GetValue())
+		self.cartographer.projectionPanel.set_paint_frame(self.check_draw_frame.GetValue())
 		self.cartographer.projectionPanel.set_paint_grid(self.check_draw_grid.GetValue())
 		self.cartographer.projectionPanel.set_paint_grid_specials(self.check_draw_specials.GetValue())
 		if self.check_show_countries.GetValue():

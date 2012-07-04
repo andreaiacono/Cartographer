@@ -13,8 +13,8 @@ class LambertProjection(GenericProjection):
 	def get_coords(self, x, centerx, y, centery, original_x, original_y, width, height):
 		
 		r = self.F * math.pow( mpmath.cot(math.pi/4 + math.radians(y)/2) , self.n)
-		new_x = r * math.sin(self.n*(math.radians(x - centerx)))	
-		new_y = self.r0 - r * math.cos(self.n * (math.radians(x-centerx)))					
+		new_x = r * math.sin(self.n*(math.radians(x)))	
+		new_y = self.r0 - r * math.cos(self.n * (math.radians(x)))					
 		
 		return 7*new_x, 7*new_y
 	
@@ -22,10 +22,7 @@ class LambertProjection(GenericProjection):
 		self.phi1 = math.radians(phi1)
 		self.phi2 = math.radians(phi2)
 		self.precompute_values()
-		
-	def set_phi2(self, val):
-		self.phi2 = val
-		self.precompute_values()
+
 		
 	def precompute_values(self):
 		print "precomputing values: phi1=" + str(self.phi1) + " phi2=" + str(self.phi2)

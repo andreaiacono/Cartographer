@@ -5,7 +5,6 @@ import proj_empty_configuration
 import proj_lambert
 import proj_lambert_configuration
 import proj_mercator
-import proj_mercator_configuration
 import proj_peters
 import options_window
 import wx
@@ -23,6 +22,29 @@ class CartographerFrame(wx.Frame):
 		wx.EVT_CLOSE(self, self.OnQuit)
 		wx.EVT_KEY_DOWN(self, self.OnKeyDown)
 		
+		top_splitter = wx.SplitterWindow(self, style=wx.SP_BORDER)
+		self.settings_splitter = wx.SplitterWindow(top_splitter)
+		
+		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1)
+		self.projectionPanel.projection = proj_mercator.MercatorProjection()
+		top_splitter.SplitHorizontally(self.settings_splitter, self.projectionPanel)
+		top_splitter.SetSashGravity(0.3)
+		
+		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Mercator")
+		self.positionCanvas = panel_position.PositionCanvas(self.settings_splitter, self)
+		self.settings_splitter.SplitVertically(self.positionCanvas, self.configurationPanel)
+		self.settings_splitter.SetSashGravity(0.5)
+
+		wx.EVT_KEY_DOWN(self.configurationPanel, self.OnKeyDown)
+		wx.EVT_KEY_DOWN(self.positionCanvas, self.OnKeyDown)
+		wx.EVT_KEY_DOWN(self.projectionPanel, self.OnKeyDown)
+
+		
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(top_splitter, 1, wx.EXPAND)
+		self.SetSizer(sizer)
+		self.options = None
+		
 		menu_bar = wx.MenuBar()
 		
 		file_menu = wx.Menu()
@@ -38,7 +60,6 @@ class CartographerFrame(wx.Frame):
 		wx.EVT_MENU(self, ID_QUIT, self.OnQuit)
 		
 		menu_bar.Append(file_menu, "&File");
-		
 		
 		menu_proj = wx.Menu()
 
@@ -85,6 +106,39 @@ class CartographerFrame(wx.Frame):
 		
 		menu_bar.Append(menu_proj, "&Projections");
 
+		menu_views = wx.Menu()
+		
+		self.ID_EUROPE = wx.NewId()
+		menu_views.Append(self.ID_EUROPE, "Center to &Europe", "Centers the map on Europe")
+		wx.EVT_MENU(self, self.ID_EUROPE, self.Center)
+
+		self.ID_NORTH_AMERICA = wx.NewId()
+		menu_views.Append(self.ID_NORTH_AMERICA, "Center to &North America", "Centers the map on North America")
+		wx.EVT_MENU(self, self.ID_NORTH_AMERICA, self.Center)
+		
+		self.ID_SOUTH_AMERICA = wx.NewId()
+		menu_views.Append(self.ID_SOUTH_AMERICA, "Center to &South America", "Centers the map on South America")
+		wx.EVT_MENU(self, self.ID_SOUTH_AMERICA, self.Center)
+
+		self.ID_ASIA = wx.NewId()
+		menu_views.Append(self.ID_ASIA, "Center to &Asia", "Centers the map on Asia")
+		wx.EVT_MENU(self, self.ID_ASIA, self.Center)
+		
+		self.ID_AFRICA = wx.NewId()
+		menu_views.Append(self.ID_AFRICA, "Center to A&frica", "Centers the map on Africa")
+		wx.EVT_MENU(self, self.ID_AFRICA, self.Center)
+
+		self.ID_OCEANIA = wx.NewId()
+		menu_views.Append(self.ID_OCEANIA, "Center to &Oceania", "Centers the map on Oceania")
+		wx.EVT_MENU(self, self.ID_OCEANIA, self.Center)
+
+		self.ID_ANTARCTICA = wx.NewId()
+		menu_views.Append(self.ID_ANTARCTICA, "Center to An&tarctica", "Centers the map on Antarctica")
+		wx.EVT_MENU(self, self.ID_ANTARCTICA, self.Center)
+
+		menu_bar.Append(menu_views, "&Views");
+
+
 		menu_tools = wx.Menu()
 		
 		ID_OPTIONS = wx.NewId()
@@ -92,7 +146,6 @@ class CartographerFrame(wx.Frame):
 		wx.EVT_MENU(self, ID_OPTIONS, self.OnOptions)
 		
 		menu_bar.Append(menu_tools, "&Tools");
-
 		menu_about = wx.Menu()
 		
 		ID_INFO = wx.NewId()
@@ -106,27 +159,10 @@ class CartographerFrame(wx.Frame):
 		self.CreateStatusBar()
 		self.SetStatusText("Ready")
 		self.rotationx = 0
-		self.rotationy = 180
+		self.rotationy = 0
 		self.rotationz = 0
 
-		top_splitter = wx.SplitterWindow(self)
-		self.settings_splitter = wx.SplitterWindow(top_splitter)
 		
-		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1)
-		self.projectionPanel.projection = proj_mercator.MercatorProjection()
-		top_splitter.SplitHorizontally(self.settings_splitter, self.projectionPanel)
-		top_splitter.SetSashGravity(0.3)
-		
-		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Mercator")
-		self.positionCanvas = panel_position.PositionCanvas(self.settings_splitter, self)
-		self.settings_splitter.SplitVertically(self.positionCanvas, self.configurationPanel)
-		self.settings_splitter.SetSashGravity(0.5)
-
-		
-		sizer = wx.BoxSizer(wx.VERTICAL)
-		sizer.Add(top_splitter, 1, wx.EXPAND)
-		self.SetSizer(sizer)
-		self.options = None
 		
 	def OnOptions(self, event):
 		self.options = options_window.Options(None, self)
@@ -139,6 +175,7 @@ class CartographerFrame(wx.Frame):
 
 	def OnKeyDown(self, event):
 		key = event.GetKeyCode()
+		print key
 		if key == wx.WXK_LEFT or key == wx.WXK_NUMPAD_LEFT:
 			self.rotationx -= 5
 			self.projectionPanel.rotationx = self.rotationx
@@ -165,6 +202,7 @@ class CartographerFrame(wx.Frame):
 			self.projectionPanel.Refresh()
 				
 	def refresh(self):
+		print "refresh"
 		self.projectionPanel.rotationx = self.rotationx
 		self.projectionPanel.rotationy = self.rotationy
 		self.projectionPanel.rotationz = self.rotationz
@@ -172,46 +210,68 @@ class CartographerFrame(wx.Frame):
 		
 		
 	def SetMercatorProjection(self, event):
-		self.projectionPanel.projection = proj_mercator.MercatorProjection()
-		self.configurationPanel = proj_mercator_configuration.ConfigurationPanel(self.settings_splitter, -1)
-		self.SetTitle("Cartographer - Mercator Projection")
-		self.refresh()
+		name = "Mercator projection"
+		self.replace_projection(name, proj_mercator.MercatorProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 		
 	def SetPetersProjection(self, event):
-		self.projectionPanel.projection = proj_peters.PetersProjection()
-		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Peters projection")
-		self.SetTitle("Cartographer - Peters Projection")
-		self.refresh()
-	
+		name = "Peters Projection"
+		self.replace_projection(name,proj_peters.PetersProjection(),  proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+
 	def SetLambertProjection(self, event):
-		self.projectionPanel.projection = proj_lambert.LambertProjection()
-		self.configurationPanel = proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self)
-		self.SetTitle("Cartographer - Lambert Projection")
-		self.refresh()
+		name = "Lambert Projection"
+		self.replace_projection(name, proj_lambert.LambertProjection(),  proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self))
 		
 	def SetAzimuthalOrtographicProjection(self, event):
-		self.projectionPanel.projection = proj_azimuthal_orthographic.AzimuthalOrthographicProjection()
-		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Azimuthal ortographic projection")
-		self.SetTitle("Cartographer - Azimuthal Ortographic Projection")
-		self.refresh()
+		name = "Azimuthal ortographic projection"
+		self.replace_projection(name,  proj_azimuthal_orthographic.AzimuthalOrthographicProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
 	def SetSinusoidalProjection(self, event):
-		self.projectionPanel.projection = proj_sinusoidal.SinusoidalProjection()
-		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Sinusoidal ortographic projection")
-		self.SetTitle("Cartographer - Sinusoidal Projection")
-		self.refresh()
+		name = "Sinusoidal projection"
+		self.replace_projection(name, proj_sinusoidal.SinusoidalProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
 	def SetEckertIVProjection(self, event):
-		self.projectionPanel.projection = proj_eckertIV.EckertIVProjection()
-		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Eckert IV projection")
-		self.SetTitle("Cartographer - Eckert IV Projection")
-		self.refresh()
+		name="Eckert IV Projection"
+		self.replace_projection(name, proj_eckertIV.EckertIVProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 		
 	def SetCollignonProjection(self, event):
-		self.projectionPanel.projection = proj_collignon.CollignonProjection()
-		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Collignon projection")
-		self.SetTitle("Cartographer - Collignon Projection")
+		name = "Collignon projection"
+		self.replace_projection(name, proj_collignon.CollignonProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+		
+	def replace_projection(self, name, new_projection, new_configuration):
+		
+		self.projectionPanel.projection = new_projection
+		old_conf = self.settings_splitter.GetWindow2()
+		new_conf = new_configuration
+		self.settings_splitter.ReplaceWindow(old_conf, new_conf)
+		old_conf.Destroy()
+		
+		self.SetTitle("Cartographer - " + name)
 		self.refresh()
+		
+	def Center(self, event):
+		if event.GetId() == self.ID_EUROPE:
+			self.set_center(0, 0, 0)
+		elif event.GetId() == self.ID_NORTH_AMERICA:
+			self.set_center(90, 0, 0)
+		elif event.GetId() == self.ID_SOUTH_AMERICA:
+			self.set_center(0, 90, 0)
+		elif event.GetId() == self.ID_ASIA:
+			self.set_center(0, 0, 90)
+		elif event.GetId() == self.ID_AFRICA:
+			self.set_center(180, 0, 0)
+		elif event.GetId() == self.ID_OCEANIA:
+			self.set_center(0, 180, 0)
+		elif event.GetId() == self.ID_ANTARCTICA:
+			self.set_center(0, 0, 180)
+			
+	
+	def set_center(self, x, y, z):
+		
+		self.rotationx = x
+		self.rotationy = y
+		self.rotationz = z
+		self.refresh()
+		
 	def OnExport(self, event) :
 	 	
 #	 	dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir = "", defaultFile = "", wildcard = "*.png", style = wx.SAVE)
@@ -224,58 +284,58 @@ class CartographerFrame(wx.Frame):
 		mem.SelectObject(image)
 		mem.BeginDrawing() 
 
-		okno = panel_projection.ProjectionPanel(self, -1)
-		okno.projection = self.projectionPanel.projection
-		okno.set_shapes(2)
-		okno.resolution = 1
-		okno.grid_resolution = 1
-		okno.set_paint_grid(self.projectionPanel.paint_grid)
-		okno.set_paint_grid_specials(self.projectionPanel.paint_grid_specials)
-		okno.rotationx = self.projectionPanel.rotationx
-		okno.rotationy = self.projectionPanel.rotationy
-		okno.rotationz = self.projectionPanel.rotationz
-		okno.width = width
-		okno.height = height
-		okno.mf = height / float(180)
-		okno.tx = okno.mf * 180 + (width - okno.mf * 360) / 2
-		okno.ty = okno.mf * 90
-		okno.drawProjection(mem, width, height)
+		proj_panel = panel_projection.ProjectionPanel(self, -1)
+		proj_panel.projection = self.projectionPanel.projection
+		proj_panel.set_shapes(2)
+		proj_panel.resolution = 1
+		proj_panel.grid_resolution = 1
+		proj_panel.set_paint_grid(self.projectionPanel.paint_grid)
+		proj_panel.set_paint_grid_specials(self.projectionPanel.paint_grid_specials)
+		proj_panel.rotationx = self.projectionPanel.rotationx
+		proj_panel.rotationy = self.projectionPanel.rotationy
+		proj_panel.rotationz = self.projectionPanel.rotationz
+		proj_panel.width = width
+		proj_panel.height = height
+		proj_panel.mf = height / float(180)
+		proj_panel.tx = proj_panel.mf * 180 + (width - proj_panel.mf * 360) / 2
+		proj_panel.ty = proj_panel.mf * 90
+		proj_panel.draw_projection(mem, width, height)
 
-		mem.Blit(0, 0, 2000, 1000, wx.PaintDC(okno), 0, 0) 
+		mem.Blit(0, 0, 2000, 1000, wx.PaintDC(proj_panel), 0, 0) 
 		mem.EndDrawing() 
 		
 		image.SaveFile("/home/andrea/test.png" , wx.BITMAP_TYPE_PNG) 
-  		okno.Destroy(
-					)
+  		proj_panel.Destroy()
+  		
 	def OnInfo(self, event):
-
-		description = """Cartographer is a simple cartography application"""
 
 		licence = """Cartographer is free software; you can redistribute 
 it and/or modify it under the terms of the GNU General Public License as 
 published by the Free Software Foundation; either version 2 of the License, 
 or (at your option) any later version.
+
 Cartographer is distributed in the hope that it will be useful, 
 but WITHOUT ANY WARRANTY; without even the implied warranty of 
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
 See the GNU General Public License for more details. You should have 
 received a copy of the GNU General Public License along with File Hunter; 
 if not, write to the Free Software Foundation, Inc., 59 Temple Place, 
 Suite 330, Boston, MA  02111-1307  USA"""
 		
-#		info = wx.AboutDialogInfo()
-#		
-#		info.SetIcon(wx.Icon('mercator.png', wx.BITMAP_TYPE_PNG))
-#		info.SetName('Cartographer')
-#		info.SetVersion('1.0')
-#		info.SetDescription(description)
-#		info.SetCopyright('(C) 2012 Andrea Iacono')
-#		info.SetWebSite('http://www.zetcode.com')
-#		info.SetLicence(licence)
-#		info.AddDeveloper('Andrea Iacono')
-#		info.AddDocWriter('Andrea Iacono')
-#		
-#		wx.AboutBox(info)
+		info = wx.AboutDialogInfo()
+		
+		info.SetIcon(wx.Icon('mercator.png', wx.BITMAP_TYPE_PNG))
+		info.SetName('Cartographer')
+		info.SetVersion('1.0')
+		info.SetDescription("Cartographer is a simple cartography application for making earth maps in real-time")
+		info.SetCopyright('(C) 2012 Andrea Iacono')
+		info.SetWebSite('http://www.github.com/andreaiacono')
+		info.SetLicence(licence)
+		info.AddDeveloper('Andrea Iacono')
+		info.AddDocWriter('Andrea Iacono')
+		
+		wx.AboutBox(info)
 
 class CartographerApplication(wx.App):
 	
