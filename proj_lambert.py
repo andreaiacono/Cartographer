@@ -28,4 +28,4 @@ class LambertProjection(GenericProjection):
 		print "precomputing values: phi1=" + str(self.phi1) + " phi2=" + str(self.phi2)
 		self.n = (math.log(math.cos(self.phi1) * mpmath.sec(self.phi2)))/	math.log(math.tan(math.pi/4 + self.phi2/2) * mpmath.cot(math.pi/4 + self.phi1/2))
 		self.F = (math.cos(self.phi1) * math.tan(math.pi / 4 + self.phi1 / 2))/ self.n
-		self.r0 = self.F * math.pow( mpmath.cot(math.pi/4 + math.radians(30)/2 ), self.n)
+		self.r0 = self.F * math.pow( mpmath.cot(math.pi/4 + math.radians(self.phi1)/2 ), self.n)

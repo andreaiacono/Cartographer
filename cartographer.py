@@ -219,11 +219,12 @@ class CartographerFrame(wx.Frame):
 
 	def SetLambertProjection(self, event):
 		name = "Lambert Projection"
-		self.replace_projection(name, proj_lambert.LambertProjection(),  proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self))
+		proj = proj_lambert.LambertProjection()
+		self.replace_projection(name, proj,  proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 		
 	def SetAzimuthalOrtographicProjection(self, event):
 		name = "Azimuthal ortographic projection"
-		self.replace_projection(name,  proj_azimuthal_orthographic.AzimuthalOrthographicProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+		self.replace_projection(name, proj_azimuthal_orthographic.AzimuthalOrthographicProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
 	def SetSinusoidalProjection(self, event):
 		name = "Sinusoidal projection"

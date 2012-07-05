@@ -2,7 +2,7 @@ import wx
 
 class ConfigurationPanel(wx.Panel):
     
-    def __init__(self, parent, window_id, cartographer):
+    def __init__(self, parent, window_id, cartographer, projection):
     
         sty = wx.NO_BORDER
         wx.Window.__init__(self, parent, window_id, style=sty, size=wx.Size(200, 80))
@@ -21,8 +21,8 @@ class ConfigurationPanel(wx.Panel):
         
         self.slider_phi1 = wx.Slider(self.panel, minValue=-89, maxValue=89, style=wx.SL_HORIZONTAL)
         self.slider_phi2 = wx.Slider(self.panel, minValue=-89, maxValue=89, style=wx.SL_HORIZONTAL)
-        self.slider_phi1.SetValue(self.cartographer.projectionPanel.projection.phi1)
-        self.slider_phi2.SetValue(self.cartographer.projectionPanel.projection.phi2)
+        self.slider_phi1.SetValue(projection.phi1)
+        self.slider_phi2.SetValue(projection.phi2)
         
         self.Bind(wx.EVT_SLIDER, self.on_update)
         
