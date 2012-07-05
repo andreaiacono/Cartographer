@@ -15,11 +15,8 @@ class MercatorProjection(GenericProjection):
 			fract_y = i / float(100)
 			self.new_y[i] = (35*mpmath.asinh(math.tan(math.radians(fract_y))))
 	
-	def get_coords(self, x, centerx, y, centery, original_x, original_y, width, height):
+	def get_coords(self, x, y):
 		#y = 35*math.asinh(math.tan(math.radians(y)))
 		return x, self.new_y[int(y*100)]
 
-	def set_phi(self, phi1, phi2):
-		self.phi1 = phi1
-		self.phi2 = phi2
-		
+	

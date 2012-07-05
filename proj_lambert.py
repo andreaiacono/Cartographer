@@ -10,7 +10,7 @@ class LambertProjection(GenericProjection):
 		self.phi2 = math.radians(60)
 		self.precompute_values()
 			
-	def get_coords(self, x, centerx, y, centery, original_x, original_y, width, height):
+	def get_coords(self, x, y):
 		
 		r = self.F * math.pow( mpmath.cot(math.pi/4 + math.radians(y)/2) , self.n)
 		new_x = r * math.sin(self.n*(math.radians(x)))	

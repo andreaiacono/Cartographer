@@ -11,6 +11,6 @@ class PetersProjection(GenericProjection):
 			fract_y = i / float(100)
 			self.new_y[i] = 85 * math.sin(math.radians(fract_y))
 
-	def get_coords(self, x, centerx, y, centery, original_x, original_y, width, height):
+	def get_coords(self, x, y):
 		return x, self.new_y[int(y*100)]
 
