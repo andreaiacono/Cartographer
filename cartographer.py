@@ -109,34 +109,34 @@ class CartographerFrame(wx.Frame):
 		menu_views = wx.Menu()
 		
 		self.ID_EUROPE = wx.NewId()
-		menu_views.Append(self.ID_EUROPE, "Center to &Europe", "Centers the map on Europe")
+		menu_views.Append(self.ID_EUROPE, "Center map on &Europe", "Centers the map on Europe")
 		wx.EVT_MENU(self, self.ID_EUROPE, self.Center)
 
 		self.ID_NORTH_AMERICA = wx.NewId()
-		menu_views.Append(self.ID_NORTH_AMERICA, "Center to &North America", "Centers the map on North America")
+		menu_views.Append(self.ID_NORTH_AMERICA, "Center map on &North America", "Centers the map on North America")
 		wx.EVT_MENU(self, self.ID_NORTH_AMERICA, self.Center)
 		
 		self.ID_SOUTH_AMERICA = wx.NewId()
-		menu_views.Append(self.ID_SOUTH_AMERICA, "Center to &South America", "Centers the map on South America")
+		menu_views.Append(self.ID_SOUTH_AMERICA, "Center map on &South America", "Centers the map on South America")
 		wx.EVT_MENU(self, self.ID_SOUTH_AMERICA, self.Center)
 
 		self.ID_ASIA = wx.NewId()
-		menu_views.Append(self.ID_ASIA, "Center to &Asia", "Centers the map on Asia")
+		menu_views.Append(self.ID_ASIA, "Center map on &Asia", "Centers the map on Asia")
 		wx.EVT_MENU(self, self.ID_ASIA, self.Center)
 		
 		self.ID_AFRICA = wx.NewId()
-		menu_views.Append(self.ID_AFRICA, "Center to A&frica", "Centers the map on Africa")
+		menu_views.Append(self.ID_AFRICA, "Center map on A&frica", "Centers the map on Africa")
 		wx.EVT_MENU(self, self.ID_AFRICA, self.Center)
 
 		self.ID_OCEANIA = wx.NewId()
-		menu_views.Append(self.ID_OCEANIA, "Center to &Oceania", "Centers the map on Oceania")
+		menu_views.Append(self.ID_OCEANIA, "Center map on &Oceania", "Centers the map on Oceania")
 		wx.EVT_MENU(self, self.ID_OCEANIA, self.Center)
 
 		self.ID_ANTARCTICA = wx.NewId()
-		menu_views.Append(self.ID_ANTARCTICA, "Center to An&tarctica", "Centers the map on Antarctica")
+		menu_views.Append(self.ID_ANTARCTICA, "Center map on An&tarctica", "Centers the map on Antarctica")
 		wx.EVT_MENU(self, self.ID_ANTARCTICA, self.Center)
 
-		menu_bar.Append(menu_views, "&Views");
+		menu_bar.Append(menu_views, "&Center");
 
 
 		menu_tools = wx.Menu()

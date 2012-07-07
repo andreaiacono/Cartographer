@@ -8,7 +8,9 @@ class LambertProjection(GenericProjection):
 	
 		self.phi1 = math.radians(30)
 		self.phi2 = math.radians(60)
+		self.projection_type = self.ProjectionType.Conic
 		self.precompute_values()
+		
 			
 	def get_coords(self, x, y):
 		

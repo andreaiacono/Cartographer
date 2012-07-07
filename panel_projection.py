@@ -201,7 +201,7 @@ class ProjectionPanel(wx.Panel):
 		dc.SetBrush(wx.WHITE_BRUSH)
 		dc.DrawRectangle(0, 0, width, height)
 		
-		print "x=" + str(self.rotationx) + " y=" + str(self.rotationy) + " z=" + str(self.rotationz)
+		print "x=" + str(self.rotationx) + " y=" + str(self.rotationy) + " z=" + str(self.rotationz) + " tx=" + str(self.tx) + " ty=" + str(self.ty)
 
 		# draws meridian and parallels
 		if (self.paint_grid):
@@ -259,13 +259,7 @@ class ProjectionPanel(wx.Panel):
 	#	draws a frame of the map 
 	def draw_frame(self, width, height, dc):
 		
-		dc.SetPen(wx.Pen("black", 1))
-		
-		# todo: for each kind of projection the frame must be managed differently
-		self.draw_parallel(-90, width, height, False, dc)
-		self.draw_parallel(90, width, height, False, dc)
-		self.draw_meridian(-180, width, height, False, dc)
-		self.draw_meridian(180, width, height, False, dc)
+		self.projection.draw_frame(width, height, self, dc)
 		
 		
 	def transform_coords(self, lat, lon):

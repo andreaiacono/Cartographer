@@ -3,6 +3,9 @@ import math
 
 class AzimuthalOrthographicProjection(GenericProjection):
 
+	def __init__(self):
+		self.projection_type = self.ProjectionType.Azimuthal
+
 	def get_coords(self, x, y):
 		if (x < 0 or x > 180):
 			return -10000, -10000

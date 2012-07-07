@@ -4,13 +4,8 @@ import math
 class PetersProjection(GenericProjection):
 
 	def __init__(self):
-		
-		self.new_y = [0.0 for col in range(-18000,18000)]
-		
-		for i in range (-18000, 18000):
-			fract_y = i / float(100)
-			self.new_y[i] = 85 * math.sin(math.radians(fract_y))
+		self.projection_type = self.ProjectionType.Cylindric
+
 
 	def get_coords(self, x, y):
-		return x, self.new_y[int(y*100)]
-
+		return x, 85 * math.sin(math.radians(y))
