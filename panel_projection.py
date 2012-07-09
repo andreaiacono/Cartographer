@@ -10,10 +10,11 @@ class ProjectionPanel(wx.Panel):
 
 
 	
-	def __init__(self, parent, window_id):
+	def __init__(self, parent, window_id, cartographer):
 		sty = wx.NO_BORDER
 		wx.Window.__init__(self, parent, window_id, style=sty)
 		self.parent = parent
+		self.cartographer = cartographer
 		
 		countriesShapeReader = lib.shapefile.Reader("shapes/ne_110m_admin_0_countries.shp")
 		self.countries = countriesShapeReader.shapes()
@@ -130,7 +131,7 @@ class ProjectionPanel(wx.Panel):
 		self.width, self.height = self.GetSizeTuple()
 		if (self.width != self.lastWidth or self.height != self.lastHeight):
 			
-			if (self.width > self.height):
+			if self.width > 2 * self.height:
 				self.mf = self.height / float(180)
 				self.tx = self.mf * 180 + (self.width - self.mf * 360) / 2
 				self.proj_width = self.width - self.mf * 360 - 10
@@ -161,7 +162,7 @@ class ProjectionPanel(wx.Panel):
 				if transform_coords:
 					lat, lon = self.transform_coords(latitude, point)
 				else:
-					lat, lon = point, latitude
+					lat, lon = latitude, point
 					
 				if (last_lat != None):
 	
@@ -183,8 +184,11 @@ class ProjectionPanel(wx.Panel):
 			
 			if (point % self.resolution_scale >= self.grid_resolution-1):
 				
-				lat, lon = self.transform_coords(point, longitude)
-				
+				if transform_coords:
+					lat, lon = self.transform_coords(point, longitude)
+				else:
+					lat, lon = point, longitude
+					
 				if (self.last_lat != None):
 					x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
 					last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(self.last_lat, self.last_lon))
@@ -256,6 +260,21 @@ class ProjectionPanel(wx.Panel):
 			
 		dc.EndDrawing
 		
+		latitude, longitude = self.cartesian_to_latlong(self.rotationx, self.rotationy, self.rotationz)
+		lat = str(round(latitude * 100,2))
+		if latitude > 0:
+			lat += "N"
+		else:
+			lat += "S"
+		
+		lon = str(round(longitude * 100, 2))
+		if longitude > 0:
+			lon += "E"
+		else:
+			lon += "W"
+			
+		self.cartographer.SetStatusText("Map is centered on " + lat + " " + lon)
+		
 	#	draws a frame of the map 
 	def draw_frame(self, width, height, dc):
 		
@@ -304,5 +323,3 @@ class ProjectionPanel(wx.Panel):
 		
 		rv = m * v
 		return rv.x, rv.y, rv.z
-		
-		#return x,y,z

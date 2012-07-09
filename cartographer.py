@@ -25,7 +25,7 @@ class CartographerFrame(wx.Frame):
 		top_splitter = wx.SplitterWindow(self, style=wx.SP_BORDER)
 		self.settings_splitter = wx.SplitterWindow(top_splitter)
 		
-		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1)
+		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1, self)
 		self.projectionPanel.projection = proj_mercator.MercatorProjection()
 		top_splitter.SplitHorizontally(self.settings_splitter, self.projectionPanel)
 		top_splitter.SetSashGravity(0.3)
