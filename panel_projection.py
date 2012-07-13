@@ -48,7 +48,59 @@ class ProjectionPanel(wx.Panel):
 		self.set_paint_grid_specials(True)
 		self.set_paint_frame(True)
 		
+		self.from_meridian = -180
+		self.to_meridian = 180
+		self.from_parallel = -90
+		self.to_parallel = 90
 		
+		self.posx = 0
+		self.posy = 0
+		self.posz = 0
+		self.x = 0
+		self.y = 0
+		self.z = 0
+		self.lastx = 0
+		self.lasty = 0
+		self.lastz = 0
+		
+				
+		self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
+		self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
+		self.Bind(wx.EVT_RIGHT_DOWN, self.OnMouseDown)
+		self.Bind(wx.EVT_RIGHT_UP, self.OnMouseUp)
+		self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
+
+
+	def OnMouseDown(self, evt):
+		self.CaptureMouse()
+		self.x, self.y = self.lastx, self.lasty = evt.GetPosition()
+		self.z = self.lastz = self.y
+
+	def OnMouseUp(self, evt):
+		self.ReleaseMouse()
+
+	def OnMouseMotion(self, evt):
+		if evt.Dragging() and ( evt.LeftIsDown() or evt.RightIsDown()):
+			self.x, self.y = evt.GetPosition()
+			
+			if evt.RightIsDown():
+				self.z = self.y
+				self.posz += self.z - self.lastz
+				self.lastz = self.z
+			else:
+				self.posx -= self.x - self.lastx
+				self.posy += self.y - self.lasty
+				self.lastx = self.x
+				self.lasty = self.y
+
+			self.cartographer.rotationx = self.posx % 360
+			self.cartographer.rotationy = self.posy % 360
+			self.cartographer.rotationz = self.posz % 360
+			self.cartographer.refresh()
+			
+			self.Refresh(False)
+
+	
 		
 		
 #		self.new_lat = []
@@ -124,25 +176,34 @@ class ProjectionPanel(wx.Panel):
 	def OnPaint(self, event):
 		dc = wx.PaintDC(self)
 		self.width, self.height = self.GetSizeTuple()
+		#self.compute_size()
 		self.draw_projection(dc, self.width, self.height)
 
 
 	def OnSize(self, event):
+		
+		self.compute_size()
+		
+	def compute_size(self):	
+		
 		self.width, self.height = self.GetSizeTuple()
 		if (self.width != self.lastWidth or self.height != self.lastHeight):
 			
+			visible_height = math.fabs(self.from_parallel) + self.to_parallel
+			visible_width = math.fabs(self.from_meridian) + self.to_meridian
+			
 			if self.width > 2 * self.height:
-				self.mf = self.height / float(180)
-				self.tx = self.mf * 180 + (self.width - self.mf * 360) / 2
-				self.proj_width = self.width - self.mf * 360 - 10
+				self.mf = self.height / float(visible_height)
+				self.tx = self.mf * visible_width/2 + (self.width - self.mf * visible_width) / 2
+				self.proj_width = self.width - self.mf * visible_width - 10
 				self.proj_height = self.height - 10
-				self.ty = self.mf * 90
+				self.ty = self.mf * visible_height/2
 			else:
-				self.mf = self.width / float(360)
-				self.tx = self.mf * 180 
-				self.ty = self.mf * 90 + (self.height - self.mf * 180) / 2
+				self.mf = self.width / float(visible_width)
+				self.tx = self.mf * visible_width/2 
+				self.ty = self.mf * visible_height/2 + (self.height - self.mf * visible_height) / 2
 				self.proj_width = self.width
-				self.proj_height = self.height - self.mf * 180
+				self.proj_height = self.height - self.mf * visible_height
 			dc = wx.PaintDC(self)
 			self.draw_projection(dc, self.width, self.height)
 			
@@ -260,20 +321,20 @@ class ProjectionPanel(wx.Panel):
 			
 		dc.EndDrawing
 		
-		latitude, longitude = self.cartesian_to_latlong(self.rotationx, self.rotationy, self.rotationz)
-		lat = str(round(latitude * 100,2))
-		if latitude > 0:
-			lat += "N"
-		else:
-			lat += "S"
-		
-		lon = str(round(longitude * 100, 2))
-		if longitude > 0:
-			lon += "E"
-		else:
-			lon += "W"
+#		latitude, longitude = self.cartesian_to_latlong(self.rotationx, self.rotationy, self.rotationz)
+#		lat = str(round(latitude * 100,2))
+#		if latitude > 0:
+#			lat += "N"
+#		else:
+#			lat += "S"
+#		
+#		lon = str(round(longitude * 100, 2))
+#		if longitude > 0:
+#			lon += "E"
+#		else:
+#			lon += "W"
 			
-		self.cartographer.SetStatusText("Map is centered on " + lat + " " + lon)
+		self.cartographer.SetStatusText("Map is centered on " + str(self.rotationx) +  " " + str(self.rotationy) +  " " + str(self.rotationz))
 		
 	#	draws a frame of the map 
 	def draw_frame(self, width, height, dc):
@@ -323,3 +384,17 @@ class ProjectionPanel(wx.Panel):
 		
 		rv = m * v
 		return rv.x, rv.y, rv.z
+
+	
+	def set_coordinates(self, rotationx, rotationy, rotationz):
+		self.rotationx = rotationx
+		self.rotationy = rotationy
+		self.rotationz = rotationz
+	
+	def set_from_meridian(self, value):
+		self.from_meridian = value
+		self.compute_size()
+	
+	def set_from_parallel(self, value):
+		self.from_parallel = value
+		self.compute_size()

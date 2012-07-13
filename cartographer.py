@@ -11,6 +11,12 @@ import wx
 import proj_sinusoidal
 import proj_eckertIV
 import proj_collignon
+import proj_miller
+import proj_mollweide
+import proj_aitoff
+import proj_stereographic
+import proj_stereographic_configuration
+import proj_weichel
 
 
 class CartographerFrame(wx.Frame):
@@ -18,26 +24,26 @@ class CartographerFrame(wx.Frame):
 
 	
 	def __init__(self):
-		wx.Frame.__init__(self, parent=None, id= -1, title="Cartographer", pos=wx.DefaultPosition, size=wx.Size(320, 200))
+		wx.Frame.__init__(self, parent=None, id= -1, title="Cartographer", pos=wx.DefaultPosition, size=wx.Size(640, 480))
 		wx.EVT_CLOSE(self, self.OnQuit)
 		wx.EVT_KEY_DOWN(self, self.OnKeyDown)
 		
 		top_splitter = wx.SplitterWindow(self, style=wx.SP_BORDER)
 		self.settings_splitter = wx.SplitterWindow(top_splitter)
 		
-		self.projectionPanel = panel_projection.ProjectionPanel(top_splitter, -1, self)
-		self.projectionPanel.projection = proj_mercator.MercatorProjection()
-		top_splitter.SplitHorizontally(self.settings_splitter, self.projectionPanel)
+		self.projection_panel = panel_projection.ProjectionPanel(top_splitter, -1, self)
+		self.projection_panel.projection = proj_mercator.MercatorProjection()
+		top_splitter.SplitHorizontally(self.settings_splitter, self.projection_panel)
 		top_splitter.SetSashGravity(0.3)
 		
 		self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Mercator")
-		self.positionCanvas = panel_position.PositionCanvas(self.settings_splitter, self)
-		self.settings_splitter.SplitVertically(self.positionCanvas, self.configurationPanel)
+		self.position_canvas = panel_position.PositionCanvas(self.settings_splitter, self)
+		self.settings_splitter.SplitVertically(self.position_canvas, self.configurationPanel)
 		self.settings_splitter.SetSashGravity(0.5)
 
 		wx.EVT_KEY_DOWN(self.configurationPanel, self.OnKeyDown)
-		wx.EVT_KEY_DOWN(self.positionCanvas, self.OnKeyDown)
-		wx.EVT_KEY_DOWN(self.projectionPanel, self.OnKeyDown)
+		wx.EVT_KEY_DOWN(self.position_canvas, self.OnKeyDown)
+		wx.EVT_KEY_DOWN(self.projection_panel, self.OnKeyDown)
 
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
@@ -74,6 +80,11 @@ class CartographerFrame(wx.Frame):
 		menu_cylindrical.Append(ID_PROJ_PETERS, "&Peters", "Shows a Peters projection")
 		wx.EVT_MENU(self, ID_PROJ_PETERS, self.SetPetersProjection)
 		
+		ID_PROJ_MILLER = wx.NewId()
+		menu_cylindrical.Append(ID_PROJ_MILLER, "M&iller", "Shows a Miller projection")
+		wx.EVT_MENU(self, ID_PROJ_MILLER, self.SetMillerProjection)
+		
+		
 		menu_pseudocyl = wx.Menu()		
 		menu_proj.AppendMenu(wx.ID_ANY, "P&seudo Cylindrical Projections", menu_pseudocyl)
 		
@@ -89,6 +100,9 @@ class CartographerFrame(wx.Frame):
 		menu_pseudocyl.Append(ID_PROJ_COLLIGNON, "&Collignon", "Shows a Collignon projection")
 		wx.EVT_MENU(self, ID_PROJ_COLLIGNON, self.SetCollignonProjection)
 
+		ID_PROJ_MOLLWEIDE = wx.NewId()
+		menu_pseudocyl.Append(ID_PROJ_MOLLWEIDE, "M&ollweide", "Shows a Mollweide projection")
+		wx.EVT_MENU(self, ID_PROJ_MOLLWEIDE, self.SetMollweideProjection)
 
 		menu_conic = wx.Menu()		
 		menu_proj.AppendMenu(wx.ID_ANY, "C&onic Projections", menu_conic)
@@ -103,6 +117,19 @@ class CartographerFrame(wx.Frame):
 		ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC = wx.NewId()
 		menu_azimuthal.Append(ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, "&Azimuthal Orthographic", "Shows an azimuthal orthographic projection")
 		wx.EVT_MENU(self, ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, self.SetAzimuthalOrtographicProjection)
+		
+		ID_PROJ_STEREOGRAPHIC = wx.NewId()
+		menu_azimuthal.Append(ID_PROJ_STEREOGRAPHIC, "&Stereographic", "Shows a stereographic projection")
+		wx.EVT_MENU(self, ID_PROJ_STEREOGRAPHIC, self.SetStereographicProjection)
+		
+		ID_PROJ_AITOFF = wx.NewId()
+		menu_azimuthal.Append(ID_PROJ_AITOFF, "A&itoff Projection", "Shows a Aiteoff projection")
+		wx.EVT_MENU(self, ID_PROJ_AITOFF, self.SetAitoffProjection)
+		
+		ID_PROJ_WIECHEL = wx.NewId()
+		menu_azimuthal.Append(ID_PROJ_WIECHEL, "&Weichel Projection", "Shows a Weichel projection")
+		wx.EVT_MENU(self, ID_PROJ_WIECHEL, self.SetWeichelProjection)
+		
 		
 		menu_bar.Append(menu_proj, "&Projections");
 
@@ -178,36 +205,35 @@ class CartographerFrame(wx.Frame):
 		print key
 		if key == wx.WXK_LEFT or key == wx.WXK_NUMPAD_LEFT:
 			self.rotationx -= 5
-			self.projectionPanel.rotationx = self.rotationx
-			self.projectionPanel.Refresh()
+			self.projection_panel.rotationx = self.rotationx
+			self.projection_panel.Refresh()
 		elif key == wx.WXK_RIGHT or key == wx.WXK_NUMPAD_RIGHT:
 			self.rotationx += 5
-			self.projectionPanel.rotationx = self.rotationx
-			self.projectionPanel.Refresh()
+			self.projection_panel.rotationx = self.rotationx
+			self.projection_panel.Refresh()
 		elif key == wx.WXK_UP or key == wx.WXK_NUMPAD_UP:
 			self.rotationy -= 5
-			self.projectionPanel.rotationy = self.rotationy
-			self.projectionPanel.Refresh()
+			self.projection_panel.rotationy = self.rotationy
+			self.projection_panel.Refresh()
 		elif key == wx.WXK_DOWN or key == wx.WXK_NUMPAD_DOWN:
 			self.rotationy += 5
-			self.projectionPanel.rotationy = self.rotationy
-			self.projectionPanel.Refresh()
+			self.projection_panel.rotationy = self.rotationy
+			self.projection_panel.Refresh()
 		elif key == wx.WXK_PAGEUP or key == wx.WXK_NUMPAD_PAGEUP:
 			self.rotationz -= 5
-			self.projectionPanel.rotationz = self.rotationz
-			self.projectionPanel.Refresh()
+			self.projection_panel.rotationz = self.rotationz
+			self.projection_panel.Refresh()
 		elif key == wx.WXK_PAGEDOWN or key == wx.WXK_NUMPAD_PAGEDOWN:
 			self.rotationz += 5
-			self.projectionPanel.rotationz = self.rotationz
-			self.projectionPanel.Refresh()
+			self.projection_panel.rotationz = self.rotationz
+			self.projection_panel.Refresh()
 				
 	def refresh(self):
-		print "refresh"
-		self.projectionPanel.rotationx = self.rotationx
-		self.projectionPanel.rotationy = self.rotationy
-		self.projectionPanel.rotationz = self.rotationz
-		self.projectionPanel.Refresh()
+		self.projection_panel.set_coordinates(self.rotationx, self.rotationy, self.rotationz)
+		self.position_canvas.set_earth_coordinates(self.rotationx, self.rotationy, self.rotationz)
 		
+		self.projection_panel.Refresh()
+		self.position_canvas.Refresh()
 		
 	def SetMercatorProjection(self, event):
 		name = "Mercator projection"
@@ -226,6 +252,11 @@ class CartographerFrame(wx.Frame):
 		name = "Azimuthal ortographic projection"
 		self.replace_projection(name, proj_azimuthal_orthographic.AzimuthalOrthographicProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
+	def SetStereographicProjection(self, event):
+		name = "Stereographic projection"
+		proj = proj_stereographic.StereographicProjection()
+		self.replace_projection(name, proj, proj_stereographic_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
+
 	def SetSinusoidalProjection(self, event):
 		name = "Sinusoidal projection"
 		self.replace_projection(name, proj_sinusoidal.SinusoidalProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
@@ -238,9 +269,25 @@ class CartographerFrame(wx.Frame):
 		name = "Collignon projection"
 		self.replace_projection(name, proj_collignon.CollignonProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 		
+	def SetMillerProjection(self, event):
+		name = "Miller projection"
+		self.replace_projection(name, proj_miller.MillerProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+		
+	def SetMollweideProjection(self, event):
+		name = "Mollweide projection"
+		self.replace_projection(name, proj_mollweide.MollweideProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+		
+	def SetAitoffProjection(self, event):
+		name = "Aitoff projection"
+		self.replace_projection(name, proj_aitoff.AitoffProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+	
+	def SetWeichelProjection(self, event):
+		name = "Weichel projection"
+		self.replace_projection(name, proj_weichel.WeichelProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+	
 	def replace_projection(self, name, new_projection, new_configuration):
 		
-		self.projectionPanel.projection = new_projection
+		self.projection_panel.projection = new_projection
 		old_conf = self.settings_splitter.GetWindow2()
 		new_conf = new_configuration
 		self.settings_splitter.ReplaceWindow(old_conf, new_conf)
@@ -251,19 +298,19 @@ class CartographerFrame(wx.Frame):
 		
 	def Center(self, event):
 		if event.GetId() == self.ID_EUROPE:
-			self.set_center(0, 0, 0)
+			self.set_center(20, -5, 35)
 		elif event.GetId() == self.ID_NORTH_AMERICA:
-			self.set_center(90, 0, 0)
+			self.set_center(-90, -45, 0)
 		elif event.GetId() == self.ID_SOUTH_AMERICA:
-			self.set_center(0, 90, 0)
+			self.set_center(243, 170, 147)
 		elif event.GetId() == self.ID_ASIA:
-			self.set_center(0, 0, 90)
+			self.set_center(85, 41, 0)
 		elif event.GetId() == self.ID_AFRICA:
-			self.set_center(180, 0, 0)
+			self.set_center(20, 0, 0)
 		elif event.GetId() == self.ID_OCEANIA:
-			self.set_center(0, 180, 0)
+			self.set_center(152, 0, 330)
 		elif event.GetId() == self.ID_ANTARCTICA:
-			self.set_center(0, 0, 180)
+			self.set_center(120, 0, 280)
 			
 	
 	def set_center(self, x, y, z):
@@ -286,15 +333,15 @@ class CartographerFrame(wx.Frame):
 		mem.BeginDrawing() 
 
 		proj_panel = panel_projection.ProjectionPanel(self, -1)
-		proj_panel.projection = self.projectionPanel.projection
+		proj_panel.projection = self.projection_panel.projection
 		proj_panel.set_shapes(2)
 		proj_panel.resolution = 1
 		proj_panel.grid_resolution = 1
-		proj_panel.set_paint_grid(self.projectionPanel.paint_grid)
-		proj_panel.set_paint_grid_specials(self.projectionPanel.paint_grid_specials)
-		proj_panel.rotationx = self.projectionPanel.rotationx
-		proj_panel.rotationy = self.projectionPanel.rotationy
-		proj_panel.rotationz = self.projectionPanel.rotationz
+		proj_panel.set_paint_grid(self.projection_panel.paint_grid)
+		proj_panel.set_paint_grid_specials(self.projection_panel.paint_grid_specials)
+		proj_panel.rotationx = self.projection_panel.rotationx
+		proj_panel.rotationy = self.projection_panel.rotationy
+		proj_panel.rotationz = self.projection_panel.rotationz
 		proj_panel.width = width
 		proj_panel.height = height
 		proj_panel.mf = height / float(180)
