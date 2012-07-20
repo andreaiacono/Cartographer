@@ -1,22 +1,24 @@
+import options_window
 import panel_position
 import panel_projection
+import proj_aitoff
+import proj_azimuthal_equidistant
 import proj_azimuthal_orthographic
+import proj_collignon
+import proj_eckertIV
 import proj_empty_configuration
+import proj_equal_area
 import proj_lambert
 import proj_lambert_configuration
 import proj_mercator
-import proj_peters
-import options_window
-import wx
-import proj_sinusoidal
-import proj_eckertIV
-import proj_collignon
 import proj_miller
 import proj_mollweide
-import proj_aitoff
+import proj_sinusoidal
 import proj_stereographic
 import proj_stereographic_configuration
 import proj_weichel
+import wx
+import proj_equal_area_configuration
 
 
 class CartographerFrame(wx.Frame):
@@ -76,9 +78,9 @@ class CartographerFrame(wx.Frame):
 		menu_cylindrical.Append(ID_PROJ_MERCATOR, "&Mercator", "Shows a Mercator projection")
 		wx.EVT_MENU(self, ID_PROJ_MERCATOR, self.SetMercatorProjection)
 		
-		ID_PROJ_PETERS = wx.NewId()
-		menu_cylindrical.Append(ID_PROJ_PETERS, "&Peters", "Shows a Peters projection")
-		wx.EVT_MENU(self, ID_PROJ_PETERS, self.SetPetersProjection)
+		ID_PROJ_EQUAL_AREA = wx.NewId()
+		menu_cylindrical.Append(ID_PROJ_EQUAL_AREA, "&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)", "Shows an equal area projection (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)")
+		wx.EVT_MENU(self, ID_PROJ_EQUAL_AREA, self.SetEqualAreaProjection)
 		
 		ID_PROJ_MILLER = wx.NewId()
 		menu_cylindrical.Append(ID_PROJ_MILLER, "M&iller", "Shows a Miller projection")
@@ -115,15 +117,19 @@ class CartographerFrame(wx.Frame):
 		menu_proj.AppendMenu(wx.ID_ANY, "A&zimuthal Projections", menu_azimuthal)
 
 		ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC = wx.NewId()
-		menu_azimuthal.Append(ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, "&Azimuthal Orthographic", "Shows an azimuthal orthographic projection")
+		menu_azimuthal.Append(ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, "&Orthographic", "Shows an orthographic azimuthal projection")
 		wx.EVT_MENU(self, ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, self.SetAzimuthalOrtographicProjection)
+		
+		ID_PROJ_AZIMUTHAL_EQUIDISTANT = wx.NewId()
+		menu_azimuthal.Append(ID_PROJ_AZIMUTHAL_EQUIDISTANT, "&Equidistant", "Shows an orthographic equidstant projection")
+		wx.EVT_MENU(self, ID_PROJ_AZIMUTHAL_EQUIDISTANT, self.SetAzimuthalEquidistantProjection)
 		
 		ID_PROJ_STEREOGRAPHIC = wx.NewId()
 		menu_azimuthal.Append(ID_PROJ_STEREOGRAPHIC, "&Stereographic", "Shows a stereographic projection")
 		wx.EVT_MENU(self, ID_PROJ_STEREOGRAPHIC, self.SetStereographicProjection)
 		
 		ID_PROJ_AITOFF = wx.NewId()
-		menu_azimuthal.Append(ID_PROJ_AITOFF, "A&itoff Projection", "Shows a Aiteoff projection")
+		menu_azimuthal.Append(ID_PROJ_AITOFF, "&Aitoff Projection", "Shows a Aiteoff projection")
 		wx.EVT_MENU(self, ID_PROJ_AITOFF, self.SetAitoffProjection)
 		
 		ID_PROJ_WIECHEL = wx.NewId()
@@ -239,9 +245,10 @@ class CartographerFrame(wx.Frame):
 		name = "Mercator projection"
 		self.replace_projection(name, proj_mercator.MercatorProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 		
-	def SetPetersProjection(self, event):
-		name = "Peters Projection"
-		self.replace_projection(name,proj_peters.PetersProjection(),  proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+	def SetEqualAreaProjection(self, event):
+		name = "Equal Area Projection"
+		proj = proj_equal_area.EqualAreaProjection()
+		self.replace_projection(name, proj, proj_equal_area_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 
 	def SetLambertProjection(self, event):
 		name = "Lambert Projection"
@@ -252,6 +259,10 @@ class CartographerFrame(wx.Frame):
 		name = "Azimuthal ortographic projection"
 		self.replace_projection(name, proj_azimuthal_orthographic.AzimuthalOrthographicProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
+	def SetAzimuthalEquidistantProjection(self, event):
+		name = "Azimuthal equidistant projection"
+		self.replace_projection(name, proj_azimuthal_equidistant.AzimuthalEquidistantProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
+	
 	def SetStereographicProjection(self, event):
 		name = "Stereographic projection"
 		proj = proj_stereographic.StereographicProjection()
@@ -332,7 +343,7 @@ class CartographerFrame(wx.Frame):
 		mem.SelectObject(image)
 		mem.BeginDrawing() 
 
-		proj_panel = panel_projection.ProjectionPanel(self, -1)
+		proj_panel = panel_projection.ProjectionPanel(self, -1, self)
 		proj_panel.projection = self.projection_panel.projection
 		proj_panel.set_shapes(2)
 		proj_panel.resolution = 1

@@ -36,6 +36,8 @@ class PositionCanvas(GLCanvas):
 		self.Bind(wx.EVT_RIGHT_DOWN, self.OnMouseDown)
 		self.Bind(wx.EVT_RIGHT_UP, self.OnMouseUp)
 		self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
+		self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
+		self.view_distance = -10.0
 		
 		self.earth_size = 2.0
 
@@ -64,7 +66,7 @@ class PositionCanvas(GLCanvas):
 
 	def load_textures(self):
 
-		image = open("textures/earth_low.jpg")
+		image = open("textures/earth_grid.jpg")
 		ix = image.size[0]
 		iy = image.size[1]
 		image = image.tostring("raw", "RGBX", 0, -1)
@@ -118,7 +120,7 @@ class PositionCanvas(GLCanvas):
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 		glLoadIdentity()
-		glTranslatef(0.0, 0.0, -10.0)
+		glTranslatef(0.0, 0.0, self.view_distance)
 		glRotatef(self.posy, 1.0, 0.0, 0.0)
 		glRotatef(self.posx, 0.0, 0.0, 1.0)
 		glRotatef(self.posz, 0.0, 1.0, 0.0)
@@ -133,14 +135,20 @@ class PositionCanvas(GLCanvas):
 		
 		if self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Cylindric or self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.PseudoCylindric:
 			glPushMatrix()
-			glTranslatef(0.0, 0.0, -self.earth_size)
+			glTranslatef(0.0, 0.0, -self.earth_size*1.5)
 			glEnable(GL_BLEND)
 			glBlendFunc(GL_SRC_ALPHA,GL_ONE)			
 			glColor4f(1.0, 1.0, 1.0, 0.5)
 			glBindTexture(GL_TEXTURE_2D, self.plain_texture)
-			gluCylinder(self.plain_quad, self.earth_size*1.1, self.earth_size*1.1, self.earth_size * 2, 32, 64)
+			gluCylinder(self.plain_quad, self.earth_size*1.01, self.earth_size*1.01, self.earth_size * 3, 32, 64)
 			glDisable(GL_BLEND)
-			glPopMatrix();
+			glLineWidth(5.0)
+			glColor3f(0.0, 0.8, 0.0)
+			glBegin(GL_LINES)
+			glVertex3f(0.0, 0.0, self.earth_size)
+			glVertex3f(50.0, 50.0, 50.0)
+			glEnd()
+			glPopMatrix()
 		elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Conic:
 			glPushMatrix()
 			glTranslatef(0.0, 0.0, -self.earth_size)
@@ -150,7 +158,7 @@ class PositionCanvas(GLCanvas):
 			glBindTexture(GL_TEXTURE_2D, self.plain_texture)
 			gluCylinder(self.plain_quad, self.earth_size*2, 0, self.earth_size * 3, 32, 64)
 			glDisable(GL_BLEND)
-			glPopMatrix();
+			glPopMatrix()
 
 		elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Azimuthal:
 			glPushMatrix()
@@ -161,7 +169,7 @@ class PositionCanvas(GLCanvas):
 			glBindTexture(GL_TEXTURE_2D, self.plain_texture)
 			gluDisk(self.plain_quad, 0, self.earth_size * 2, 32, 64)
 			glDisable(GL_BLEND)
-			glPopMatrix();
+			glPopMatrix()
 			
 		self.SwapBuffers()
 	
@@ -177,6 +185,16 @@ class PositionCanvas(GLCanvas):
 
 	def OnMouseUp(self, evt):
 		self.ReleaseMouse()
+		
+	def OnMouseWheel(self, evt):
+
+		print "vd=" + str(self.view_distance) + " wr=" + str(evt.GetWheelRotation()) 
+		if evt.GetWheelRotation() < 0 and self.view_distance > -50:
+			self.view_distance += self.view_distance/10
+		elif evt.GetWheelRotation() > 0 and self.view_distance < -4:
+			self.view_distance -= self.view_distance/10
+		
+		self.Refresh()
 
 	def OnMouseMotion(self, evt):
 		if evt.Dragging() and (evt.LeftIsDown() or evt.RightIsDown()):
@@ -192,7 +210,7 @@ class PositionCanvas(GLCanvas):
 				self.lastx = self.x
 				self.lasty = self.y
 
-			self.Refresh(False)
+			self.Refresh()
 
 	
 
