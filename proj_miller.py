@@ -9,6 +9,6 @@ class MillerProjection(GenericProjection):
 
 	def get_coords(self, x, y):
 		
-		return x, 35 * 1.25 * math.log(math.tan(self.pi_div_four + 0.4 * math.radians(y)))
+		return x, 50 * math.log(math.tan(self.pi_div_four + 0.4 * math.radians(y)))
 
 	
