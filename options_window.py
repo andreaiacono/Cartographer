@@ -3,13 +3,13 @@ import wx
 class Options(wx.Frame):
 
 	def __init__(self, parent, cartographer):
-		super(Options, self).__init__(parent, title="Options", size=(300, 230))
+		super(Options, self).__init__(parent, title="Options", size=(500, 320))
 		self.cartographer = cartographer
 		panel = wx.Panel(self)
 		
 		hbox = wx.BoxSizer(wx.HORIZONTAL)
 		
-		fgs = wx.FlexGridSizer(5, 2, 10, 20)
+		fgs = wx.FlexGridSizer(7, 3, 10, 20)
 		
 		label_res = wx.StaticText(panel, label="Projection Resolution")
 		empty_label = wx.StaticText(panel, label="")
@@ -22,6 +22,15 @@ class Options(wx.Frame):
 		self.slider_zoom = wx.Slider(panel, minValue=15, maxValue=360, value=360, style=wx.SL_HORIZONTAL)
 		self.slider_proj_res.SetValue(cartographer.projection_panel.resolution)
 		self.slider_grid_res.SetValue(cartographer.projection_panel.grid_resolution)
+		
+		
+		label_parallel_number = wx.StaticText(panel, label="\nDraw a parallel every ") 
+		label_parallel_number_end = wx.StaticText(panel, label="\ndegrees") 
+		label_meridian_number = wx.StaticText(panel, label="\nDraw a meridian every ") 
+		label_meridian_number_end = wx.StaticText(panel, label="\ndegrees") 
+		
+		self.slider_parallel_number = wx.Slider(panel, minValue=1, maxValue=90, value=15, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
+		self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=180, value=15, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
 		
 
 		self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame') 
@@ -38,13 +47,15 @@ class Options(wx.Frame):
 		self.Bind(wx.EVT_CHECKBOX, self.on_slider_change)
 		
 		fgs.AddMany([
-					 (label_zoom), (self.slider_zoom, 1, wx.EXPAND),
-					 (label_res), (self.slider_proj_res, 1, wx.EXPAND),
-					 (self.check_draw_frame, 1, wx.EXPAND), (empty_label), 
-					 (self.check_draw_grid, 1, wx.EXPAND), (empty_label), 
-					 (label_grid_res, 1, wx.EXPAND), (self.slider_grid_res, 1, wx.EXPAND),
-					 (self.check_draw_specials, 1, wx.EXPAND), (empty_label),
-					 (self.check_show_countries, 1, wx.EXPAND), (empty_label)])
+					 (label_zoom), (self.slider_zoom, 1, wx.EXPAND), (empty_label), 
+					 (label_res), (self.slider_proj_res, 1, wx.EXPAND), (empty_label), 
+					 (self.check_draw_frame, 1, wx.EXPAND), (empty_label),  (empty_label), 
+					 (self.check_draw_grid, 1, wx.EXPAND), (empty_label),  (empty_label), 
+					 (label_grid_res, 1, wx.EXPAND), (self.slider_grid_res, 1, wx.EXPAND), (empty_label), 
+					 (label_meridian_number), (self.slider_meridian_number, 1, wx.EXPAND), (label_meridian_number_end),
+					 (label_parallel_number), (self.slider_parallel_number, 1, wx.EXPAND), (label_parallel_number_end),
+					 (self.check_draw_specials, 1, wx.EXPAND), (empty_label), (empty_label), 
+					 (self.check_show_countries, 1, wx.EXPAND), (empty_label), (empty_label) ])
 		
 		fgs.AddGrowableCol(1, 1)
 		
@@ -59,6 +70,9 @@ class Options(wx.Frame):
 		self.cartographer.projection_panel.set_paint_frame(self.check_draw_frame.GetValue())
 		self.cartographer.projection_panel.set_paint_grid(self.check_draw_grid.GetValue())
 		self.cartographer.projection_panel.set_paint_grid_specials(self.check_draw_specials.GetValue())
+		self.cartographer.projection_panel.set_meridian_degrees(self.slider_meridian_number.GetValue())
+		self.cartographer.projection_panel.set_parallel_degrees(self.slider_parallel_number.GetValue())
+		
 		if self.check_show_countries.GetValue():
 			self.cartographer.projection_panel.set_shapes(1)
 		else:

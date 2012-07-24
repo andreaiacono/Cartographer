@@ -59,6 +59,9 @@ class ProjectionPanel(wx.Panel):
 		self.lasty = 0
 		self.lastz = 0
 		
+		self.parallel_degrees = 15
+		self.meridian_degrees = 15
+
 				
 		self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
 		self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
@@ -282,13 +285,14 @@ class ProjectionPanel(wx.Panel):
 		if (self.paint_grid):
 			
 			dc.SetPen(wx.Pen("light gray", 1))
-			for meridian in range (-6, 7):
-				
-				self.draw_meridian(meridian * 15, width, height, True, dc)
+			meridian_number = 360 / self.meridian_degrees
+			for meridian in range (1, int(meridian_number)):
+				self.draw_meridian(meridian *  self.meridian_degrees, width, height, True, dc)
 			
-			for parallel in range (-6, 7):
+			parallel_number = 360 / self.parallel_degrees
+			for parallel in range (1, int(parallel_number)):
 				
-				self.draw_parallel(parallel * 15, width, height, True, dc)
+				self.draw_parallel(180 - parallel *  self.parallel_degrees, width, height, True, dc)
 
 		# draws special parallels (arctic/antarctic circles and tropics)			
 		if (self.paint_grid_specials):
@@ -395,3 +399,8 @@ class ProjectionPanel(wx.Panel):
 		self.zoom = value
 		self.compute_size()
 	
+	def set_parallel_degrees(self, value):
+		self.parallel_degrees = value
+
+	def set_meridian_degrees(self, value):
+		self.meridian_degrees = value
