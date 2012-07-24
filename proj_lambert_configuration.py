@@ -16,11 +16,11 @@ class ConfigurationPanel(wx.Panel):
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         fgs = wx.FlexGridSizer(2, 2, 10, 25)
         
-        label_phi1 = wx.StaticText(self.panel, label="Phi 1")
-        label_phi2 = wx.StaticText(self.panel, label="Phi 2")
+        label_phi1 = wx.StaticText(self.panel, label="Standard Parallel #1")
+        label_phi2 = wx.StaticText(self.panel, label="Standard Parallel #2")
         
-        self.slider_phi1 = wx.Slider(self.panel, minValue=-89, maxValue=89, style=wx.SL_HORIZONTAL)
-        self.slider_phi2 = wx.Slider(self.panel, minValue=-89, maxValue=89, style=wx.SL_HORIZONTAL)
+        self.slider_phi1 = wx.Slider(self.panel, minValue=0, maxValue=89, style=wx.SL_HORIZONTAL)
+        self.slider_phi2 = wx.Slider(self.panel, minValue=0, maxValue=89, style=wx.SL_HORIZONTAL)
         self.slider_phi1.SetValue(projection.phi1)
         self.slider_phi2.SetValue(projection.phi2)
         
@@ -34,9 +34,18 @@ class ConfigurationPanel(wx.Panel):
         self.panel.SetSizer(hbox)
         
     def on_update(self, event):
+        
+        if self.slider_phi1.GetValue() > self.slider_phi2.GetValue():
+            self.slider_phi2.SetValue(self.slider_phi1.GetValue())
+        
+        elif self.slider_phi2.GetValue() < self.slider_phi1.GetValue():
+            self.slider_phi1.SetValue(self.slider_phi2.GetValue())
+        
         #print "setting values phi1=" + str(self.slider_phi1.GetValue()) + " phi2=" + str(self.slider_phi2.GetValue())
         self.cartographer.projection_panel.projection.set_phi(self.slider_phi1.GetValue(), self.slider_phi2.GetValue())
         self.cartographer.projection_panel.Refresh()
+        self.cartographer.position_canvas.set_standard_parallel1(self.slider_phi1.GetValue())
+        self.cartographer.position_canvas.Refresh()
         
     def OnSize(self, event):
         self.panel.SetSize(self.GetSizeTuple())
