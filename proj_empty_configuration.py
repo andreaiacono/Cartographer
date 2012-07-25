@@ -10,8 +10,8 @@ class EmptyPanel(wx.Panel):
         self.panel = wx.Panel(self)
         vbox = wx.BoxSizer(wx.VERTICAL)
         
-        lbl = wx.StaticText(self.panel, label=title)
-        vbox.Add(lbl, flag=wx.EXPAND|wx.LEFT|wx.RIGHT|wx.TOP, border=10)
+        lbl = wx.StaticText(self.panel, label="\n\n  " + str(title) + " Projection has no parameters.")
+        vbox.Add(lbl, flag=wx.EXPAND|wx.LEFT|wx.RIGHT|wx.TOP, border=25)
 
         
     def OnSize(self, event):
