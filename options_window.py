@@ -3,7 +3,7 @@ import wx
 class Options(wx.Frame):
 
 	def __init__(self, parent, cartographer):
-		super(Options, self).__init__(parent, title="Options", size=(500, 320))
+		super(Options, self).__init__(parent, title="Options", size=(500, 350))
 		self.cartographer = cartographer
 		panel = wx.Panel(self)
 		
@@ -37,12 +37,14 @@ class Options(wx.Frame):
 		self.check_draw_grid = wx.CheckBox(panel, label='Draw Grid') 
 		self.check_draw_specials = wx.CheckBox(panel, label='Draw Special Parallels') 
 		self.check_show_countries = wx.CheckBox(panel, label='Draw Countries Borders')
+		self.check_draw_tissot = wx.CheckBox(panel, label="Draw Tissot's Indicatrix") 
 		
 		self.check_draw_frame.SetValue(cartographer.projection_panel.paint_frame)
 		self.check_draw_grid.SetValue(cartographer.projection_panel.paint_grid)
 		self.check_draw_specials.SetValue(cartographer.projection_panel.paint_grid_specials)
 		self.check_show_countries.SetValue(cartographer.projection_panel.shape_type == 1)
-
+		self.check_draw_tissot.SetValue(cartographer.projection_panel.draw_tissot)
+		
 		self.Bind(wx.EVT_SLIDER, self.on_slider_change)
 		self.Bind(wx.EVT_CHECKBOX, self.on_slider_change)
 		
@@ -55,7 +57,8 @@ class Options(wx.Frame):
 					 (label_meridian_number), (self.slider_meridian_number, 1, wx.EXPAND), (label_meridian_number_end),
 					 (label_parallel_number), (self.slider_parallel_number, 1, wx.EXPAND), (label_parallel_number_end),
 					 (self.check_draw_specials, 1, wx.EXPAND), (empty_label), (empty_label), 
-					 (self.check_show_countries, 1, wx.EXPAND), (empty_label), (empty_label) ])
+					 (self.check_show_countries, 1, wx.EXPAND), (empty_label), (empty_label),
+					 (self.check_draw_tissot, 1, wx.EXPAND), (empty_label), (empty_label)])
 		
 		fgs.AddGrowableCol(1, 1)
 		
@@ -69,6 +72,7 @@ class Options(wx.Frame):
 		self.cartographer.projection_panel.set_grid_resolution(self.slider_grid_res.GetValue())
 		self.cartographer.projection_panel.set_paint_frame(self.check_draw_frame.GetValue())
 		self.cartographer.projection_panel.set_paint_grid(self.check_draw_grid.GetValue())
+		self.cartographer.projection_panel.set_draw_tissot(self.check_draw_tissot.GetValue())
 		self.cartographer.projection_panel.set_paint_grid_specials(self.check_draw_specials.GetValue())
 		self.cartographer.projection_panel.set_meridian_degrees(self.slider_meridian_number.GetValue())
 		self.cartographer.projection_panel.set_parallel_degrees(self.slider_parallel_number.GetValue())
