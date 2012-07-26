@@ -1,3 +1,4 @@
+import math
 import wx
 
 class ConfigurationPanel(wx.Panel):
@@ -35,14 +36,16 @@ class ConfigurationPanel(wx.Panel):
         
     def on_update(self, event):
         
-        if self.slider_phi1.GetValue() > self.slider_phi2.GetValue():
-            self.slider_phi2.SetValue(self.slider_phi1.GetValue())
+        #print event.GetSource()
+        # TODO: if slider 1 is moving, adjust slider2, else the opposite
+        if self.slider_phi1.GetValue() >= self.slider_phi2.GetValue():
+            self.slider_phi1.SetValue(self.slider_phi1.GetValue()+1)
         
-        elif self.slider_phi2.GetValue() < self.slider_phi1.GetValue():
-            self.slider_phi1.SetValue(self.slider_phi2.GetValue())
+        elif self.slider_phi2.GetValue() <= self.slider_phi1.GetValue():
+            self.slider_phi2.SetValue(self.slider_phi1.GetValue()+1)
         
         #print "setting values phi1=" + str(self.slider_phi1.GetValue()) + " phi2=" + str(self.slider_phi2.GetValue())
-        self.cartographer.projection_panel.projection.set_phi(self.slider_phi1.GetValue(), self.slider_phi2.GetValue())
+        self.cartographer.projection_panel.projection.set_phi(math.radians(self.slider_phi1.GetValue()), math.radians(self.slider_phi2.GetValue()))
         self.cartographer.projection_panel.Refresh()
         self.cartographer.position_canvas.set_standard_parallel1(self.slider_phi1.GetValue())
         self.cartographer.position_canvas.Refresh()
