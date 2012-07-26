@@ -19,6 +19,8 @@ import proj_stereographic_configuration
 import proj_weichel
 import wx
 import proj_equal_area_configuration
+import proj_albers
+import proj_albers_configuration
 
 
 class CartographerFrame(wx.Frame):
@@ -112,6 +114,10 @@ class CartographerFrame(wx.Frame):
 		ID_PROJ_LAMBERT = wx.NewId()
 		menu_conic.Append(ID_PROJ_LAMBERT, "&Lambert", "Shows a Lambert projection")
 		wx.EVT_MENU(self, ID_PROJ_LAMBERT, self.SetLambertProjection)
+
+		ID_PROJ_ALBERS = wx.NewId()
+		menu_conic.Append(ID_PROJ_ALBERS, "&Albers", "Shows a Albers projection")
+		wx.EVT_MENU(self, ID_PROJ_ALBERS, self.SetAlbersProjection)
 
 		menu_azimuthal = wx.Menu()		
 		menu_proj.AppendMenu(wx.ID_ANY, "A&zimuthal Projections", menu_azimuthal)
@@ -254,6 +260,11 @@ class CartographerFrame(wx.Frame):
 		name = "Lambert projection"
 		proj = proj_lambert.LambertProjection()
 		self.replace_projection(name, proj,  proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
+		
+	def SetAlbersProjection(self, event):
+		name = "Albers projection"
+		proj = proj_albers.AlbersProjection()
+		self.replace_projection(name, proj,  proj_albers_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 		
 	def SetAzimuthalOrtographicProjection(self, event):
 		name = "Azimuthal ortographic projection"
