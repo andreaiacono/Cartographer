@@ -11,14 +11,20 @@ class AzimuthalEquidistantProjection(GenericProjection):
 #		if x == 0:
 #			x=0.001
 #		
-#		c = math.atan(math.radians(y/(float(x))))
+#		c = math.atan(y/(float(x))))
 #		k = c / math.sin(c)
 #		
 #		if (x < 90 or x > 90):
 #			return -10000, -10000
-#		x = 20 * k * math.cos(math.radians(y)) * math.sin(math.radians(x))
-#		y = 20 * k * math.sin(math.radians(y)) 
+#		x = 20 * k * math.cos(y)) * math.sin(x))
+#		y = 20 * k * math.sin(y)) 
 
-		new_x = 80 * math.sqrt(2 * (1-math.sin(math.radians(y)))) * math.sin(math.radians(x))
-		new_y = -80 * math.sqrt(2 * (1-math.sin(math.radians(y)))) * math.cos(math.radians(x))
+#		new_x = 80 * math.sqrt(2 * (1-math.sin(y)))) * math.sin(x))
+#		new_y = -80 * math.sqrt(2 * (1-math.sin(y)))) * math.cos(x))
+
+		a = math.acos(math.cos(y) * math.cos(x/2))
+		if (a == 0):
+			a = 0.00001
+		new_x = 80 * a * math.cos(y) * math.sin (x/2) / math.sin(a)
+		new_y = 80 * a * math.sin(y) / math.sin(a)
 		return new_x, new_y

@@ -1,3 +1,4 @@
+import math
 import wx
 
 class ConfigurationPanel(wx.Panel):
@@ -35,7 +36,7 @@ class ConfigurationPanel(wx.Panel):
         
     def on_update(self, event):
         #print "setting values phi1=" + str(self.slider_lat.GetValue()) + " phi2=" + str(self.slider_lon.GetValue())
-        self.cartographer.projection_panel.projection.set_central_coords(self.slider_lat.GetValue(), self.slider_lon.GetValue())
+        self.cartographer.projection_panel.projection.set_central_coords(math.radians(self.slider_lat.GetValue()), math.radians(self.slider_lon.GetValue()))
         self.cartographer.projection_panel.Refresh()
         
     def OnSize(self, event):

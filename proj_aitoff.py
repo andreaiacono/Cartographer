@@ -8,8 +8,10 @@ class AitoffProjection(GenericProjection):
 
 	def get_coords(self, x, y):
 		
-		cos_y = math.cos(math.radians(y))
-		z = math.acos(cos_y * math.cos(math.radians(x/2)))
-		return 50 * z * cos_y * math.sin(math.radians(x / 2)) / math.sin(z), 50 * z * math.sin(math.radians(y)) / math.sin(z) 
+		cos_y = math.cos(y)
+		z = math.acos(cos_y * math.cos(x/2))
+		if z == 0:
+			z = 0.000001
+		return 50 * z * cos_y * math.sin(x / 2) / math.sin(z), 50 * z * math.sin(y) / math.sin(z) 
 
 	

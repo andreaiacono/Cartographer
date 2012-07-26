@@ -14,9 +14,9 @@ class LambertProjection(GenericProjection):
 			
 	def get_coords(self, x, y):
 		
-		r = self.F * math.pow( mpmath.cot(math.pi/4 + math.radians(y)/2) , self.n)
-		new_x = r * math.sin(self.n*(math.radians(x)))	
-		new_y = self.r0 - r * math.cos(self.n * (math.radians(x)))					
+		r = self.F * math.pow( mpmath.cot(math.pi/4 + y/2) , self.n)
+		new_x = r * math.sin(self.n*x)	
+		new_y = self.r0 - r * math.cos(self.n * x)					
 		
 		return 7*new_x, 7*new_y
 	

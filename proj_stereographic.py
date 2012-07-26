@@ -11,10 +11,13 @@ class StereographicProjection(GenericProjection):
 
 
 	def get_coords(self, x, y):
-		cos_y = math.cos(math.radians(y))
-		k = 120 / (1 + cos_y * math.cos(math.radians(x)))
-		new_x = k * math.cos(math.radians(y)) * math.sin(math.radians(x))
-		new_y = k * math.sin(math.radians(y)) 
+		cos_y = math.cos(y)
+		den= 1 + cos_y * math.cos(x)
+		if den == 0:
+			den = 0.00001
+		k = 120 / den
+		new_x = k * cos_y * math.sin(x)
+		new_y = k * math.sin(y) 
 
 		return new_x, new_y
 	

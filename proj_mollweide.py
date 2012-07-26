@@ -8,6 +8,6 @@ class MollweideProjection(GenericProjection):
 
 	def get_coords(self, x, y):
 		
-		theta = math.asin(2 * math.radians(y) / math.pi)
-		return 100 * math.sqrt(2) * math.radians(x) * math.cos(theta) / math.pi, 50 * math.sqrt(2) * math.sin(theta)
+		theta = math.asin(2 * y / math.pi)
+		return 100 * math.sqrt(2) * x * math.cos(theta) / math.pi, 50 * math.sqrt(2) * math.sin(theta)
 	

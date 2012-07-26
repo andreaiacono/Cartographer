@@ -161,15 +161,17 @@ class PositionCanvas(GLCanvas):
 
         elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Azimuthal:
             glPushMatrix()
+            disk_size = 3
             glTranslatef(0.0, 0.0, -self.earth_radius)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
             glColor4f(1.0, 1.0, 1.0, 0.5)
             glBindTexture(GL_TEXTURE_2D, self.plain_texture)
-            gluDisk(self.plain_quad, 0, self.earth_radius * 2, 32, 64)
+            gluDisk(self.plain_quad, 0, self.earth_radius * disk_size, 32, 64)
             glDisable(GL_BLEND)
+            self.draw_circle(0, 0.01, 6)
             glPopMatrix()
-
+            self.draw_projection_azimuthal_lines()
         self.SwapBuffers()
 
     def draw_projection_cyclindric_lines(self):
@@ -199,6 +201,35 @@ class PositionCanvas(GLCanvas):
                 glVertex3f(x2, y2, z2)
         glEnd()
         glEnable(GL_TEXTURE_2D)
+    
+    def draw_projection_azimuthal_lines(self):
+        
+        # draws lines from earth to projection solid
+        glLineWidth(1.0)
+        glDisable(GL_TEXTURE_2D)
+        glBegin(GL_LINES)
+        glColor3f(0.0, 0.0, 1.0)
+        num = 9   
+        r = self.earth_radius
+        if (self.earthx == 0):
+            self.earthx = 0.0001
+        phi = math.atan(math.radians(self.earthy / math.radians(self.earthx)))
+        theta = math.acos(math.radians(self.earthz / r))
+        angle = 2 * math.pi / num
+        for i in range (0, num):
+            for j in range (0, num/2):
+            
+                x = 0#r * math.sin((theta + i) * angle) * math.cos((phi + j) * angle)
+                y = 0#r * math.sin((theta + i) * angle) * math.sin((phi + j) * angle)
+                z = 0#r * math.cos((theta + i) * angle)
+                x2 = r * j * math.cos(phi + i * angle)
+                y2 = r * j * math.sin(phi + i * angle)
+                z2 = -self.earth_radius
+                glVertex3f(x, y, z)
+                glVertex3f(x2, y2, z2)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+
     
     def set_earth_coordinates(self, x, y, z):
         self.earthx = x

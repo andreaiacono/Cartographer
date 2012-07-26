@@ -29,8 +29,8 @@ class Options(wx.Frame):
 		label_meridian_number = wx.StaticText(panel, label="\nDraw a meridian every ") 
 		label_meridian_number_end = wx.StaticText(panel, label="\ndegrees") 
 		
-		self.slider_parallel_number = wx.Slider(panel, minValue=1, maxValue=90, value=15, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
-		self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=180, value=15, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
+		self.slider_parallel_number = wx.Slider(panel, minValue=1, maxValue=90, value=30, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
+		self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=180, value=30, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
 		
 
 		self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame') 

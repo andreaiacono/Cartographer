@@ -9,5 +9,5 @@ class CollignonProjection(GenericProjection):
 		self.projection_type = self.ProjectionType.PseudoCylindric
 
 	def get_coords(self, x, y):
-		return self.constant_x * x * math.sqrt(1 - math.sin(math.radians(y))), 45 * self.constant_y * (1 - math.sqrt(1 - math.sin(math.radians(y))))
+		return self.constant_x * math.degrees(x) * math.sqrt(1 - math.sin(y)), 45 * self.constant_y * (1 - math.sqrt(1 - math.sin(y)))
 

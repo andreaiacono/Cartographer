@@ -8,8 +8,8 @@ class WeichelProjection(GenericProjection):
 
 	def get_coords(self, x, y):
 		
-		r = 2 * math.sin(0.25 * (math.pi - (2 * math.radians(y))))
-		theta = math.radians(x) + 0.25 * (math.pi - 2 * math.radians(y))
+		r = 2 * math.sin(0.25 * (math.pi - (2 * y)))
+		theta = x + 0.25 * (math.pi - 2 * y)
 		
 		x = r * math.cos(theta)
 		y = r * math.sin(theta)

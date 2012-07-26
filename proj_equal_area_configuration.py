@@ -1,4 +1,5 @@
 #coding=UTF-8
+import math
 import wx
 
 class ConfigurationPanel(wx.Panel):
@@ -60,7 +61,7 @@ class ConfigurationPanel(wx.Panel):
         
     def update_windows(self, val):
         self.label_value.SetLabel("\n" + str(round(val, 3)) + "°")
-        self.cartographer.projection_panel.projection.set_standard_latitude(self.slider_lat.GetValue() / 100)
+        self.cartographer.projection_panel.projection.set_standard_latitude(math.radians(self.slider_lat.GetValue() / 100))
         self.cartographer.projection_panel.Refresh()
         self.Refresh()
         

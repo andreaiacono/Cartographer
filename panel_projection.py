@@ -59,8 +59,8 @@ class ProjectionPanel(wx.Panel):
 		self.lasty = 0
 		self.lastz = 0
 		
-		self.parallel_degrees = 15
-		self.meridian_degrees = 15
+		self.parallel_degrees = 30
+		self.meridian_degrees = 30
 
 				
 		self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
@@ -197,15 +197,15 @@ class ProjectionPanel(wx.Panel):
 			if self.width > 2 * self.height:
 				self.mf = self.height / float(visible_height)
 				self.tx = self.mf * visible_width / 2 + (self.width - self.mf * visible_width) / 2
+				self.ty = self.mf * visible_height / 2
 				self.proj_width = self.width - self.mf * visible_width - 10
 				self.proj_height = self.height - 10
-				self.ty = self.mf * visible_height / 2
 			else:
 				self.mf = self.width / float(visible_width)
 				self.tx = self.mf * visible_width / 2 
 				self.ty = self.mf * visible_height / 2 + (self.height - self.mf * visible_height) / 2
-				self.proj_width = self.width
-				self.proj_height = self.height - self.mf * visible_height
+				self.proj_width = self.width -10
+				self.proj_height = self.height - self.mf * visible_height -10
 			
 		self.lastWidth = self.width
 		self.lastHeight = self.height
@@ -217,7 +217,7 @@ class ProjectionPanel(wx.Panel):
 		
 		# computes the first point
 		lat, lon = self.transform_coords(latitude, -180) if transform_coords else tuple(latitude, -180)
-		last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+		last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(lat), math.radians(lon)))
 		last_x += self.tx
 		last_y += self.ty
 		
@@ -227,18 +227,18 @@ class ProjectionPanel(wx.Panel):
 			if (point % self.resolution_scale >= self.grid_resolution - 1):
 			
 				lat, lon = self.transform_coords(latitude, point * 2) if transform_coords else tuple(latitude, point * 2)
-				x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+				x, y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(lat), math.radians(lon)))
 				x += self.tx
 				y += self.ty
 	
-				if (math.fabs(y - last_y) < self.proj_height / 3 and math.fabs(x - last_x) < self.proj_width / 3):
+				if (math.fabs(y - last_y) < self.proj_height / 10 and math.fabs(x - last_x) < self.proj_width / 10):
 					dc.DrawLine(x, y, last_x, last_y)
 
 				last_x, last_y = x, y
 		
 		# draws the last line
 		lat, lon = self.transform_coords(latitude, 180) if transform_coords else tuple(latitude, 180)
-		x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+		x, y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(lat), math.radians(lon)))
 		x += self.tx
 		y += self.ty
 		dc.DrawLine(x, y, last_x, last_y)
@@ -249,7 +249,7 @@ class ProjectionPanel(wx.Panel):
 		
 		# computes the first point
 		lat, lon = self.transform_coords(-180, longitude) if transform_coords else tuple(-180, longitude) 
-		last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+		last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(lat), math.radians(lon)))
 		last_x += self.tx
 		last_y += self.ty
 		
@@ -257,18 +257,18 @@ class ProjectionPanel(wx.Panel):
 			if (point % self.resolution_scale >= self.grid_resolution - 1):
 				
 				lat, lon = self.transform_coords(point * 2, longitude) if transform_coords else tuple(point * 2, longitude)
-				x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+				x, y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(lat), math.radians(lon)))
 				x += self.tx
 				y += self.ty
 		
-				if (math.fabs(y - last_y) < self.proj_height / 3 and math.fabs(x - last_x) < self.proj_width / 3):
+				if (math.fabs(y - last_y) < self.proj_height / 10 and math.fabs(x - last_x) < self.proj_width / 10):
 					dc.DrawLine(x, y, last_x, last_y)
 					
 				last_x, last_y = x, y
 
 		# draws the last line
 		lat, lon = self.transform_coords(180, longitude) if transform_coords else tuple(180, longitude) 
-		x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+		x, y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(lat), math.radians(lon)))
 		x += self.tx
 		y += self.ty
 		dc.DrawLine(x, y, last_x, last_y)
@@ -315,14 +315,14 @@ class ProjectionPanel(wx.Panel):
 					endIndex = len(shape.points) - 1
 
 				rx1, ry1 = self.transform_coords(shape.points[startIndex][1], -shape.points[startIndex][0])
-				start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(rx1, ry1))
+				start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(rx1), math.radians(ry1)))
 				
 				for point in range(startIndex + 1, endIndex):
 					
 					if (point % self.resolution_scale >= self.resolution - 1):
 						
 						rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0]) 
-						end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, ry2))
+						end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(math.radians(rx2), math.radians(ry2)))
 					
 						if (math.fabs(start_x - end_x) < width / 10 and math.fabs(start_y - end_y) < height / 10):
 							dc.DrawLine(start_x + self.tx, start_y + self.ty, end_x + self.tx, end_y + self.ty)
@@ -391,9 +391,9 @@ class ProjectionPanel(wx.Panel):
 
 	
 	def set_coordinates(self, rotationx, rotationy, rotationz):
-		self.rotationx = rotationx
-		self.rotationy = rotationy
-		self.rotationz = rotationz
+		self.posx = self.rotationx = rotationx
+		self.posy = self.rotationy = rotationy
+		self.posz = self.rotationz = rotationz
 	
 	def set_zoom(self, value):
 		self.zoom = value

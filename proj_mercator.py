@@ -8,6 +8,6 @@ class MercatorProjection(GenericProjection):
 
 	def get_coords(self, x, y):
 		
-		return x, 30*math.asinh(math.tan(math.radians(y)))
+		return math.degrees(x), 30 * math.asinh(math.tan(y))
 
 	

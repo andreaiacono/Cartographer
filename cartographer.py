@@ -246,12 +246,12 @@ class CartographerFrame(wx.Frame):
 		self.replace_projection(name, proj_mercator.MercatorProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 		
 	def SetEqualAreaProjection(self, event):
-		name = "Equal Area Projection"
+		name = "Equal Area projection"
 		proj = proj_equal_area.EqualAreaProjection()
 		self.replace_projection(name, proj, proj_equal_area_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 
 	def SetLambertProjection(self, event):
-		name = "Lambert Projection"
+		name = "Lambert projection"
 		proj = proj_lambert.LambertProjection()
 		self.replace_projection(name, proj,  proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 		

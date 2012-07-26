@@ -9,6 +9,6 @@ class EckertIVProjection(GenericProjection):
 		self.projection_type = self.ProjectionType.PseudoCylindric
 
 	def get_coords(self, x, y):
-		new_x = 60 * self.constant_x * math.radians(x) * (1 + math.cos(math.radians(y)))
-		new_y = 60 * self.constant_y * math.sin(math.radians(y))
+		new_x = 60 * self.constant_x * x * (1 + math.cos(y))
+		new_y = 60 * self.constant_y * math.sin(y)
 		return new_x, new_y
