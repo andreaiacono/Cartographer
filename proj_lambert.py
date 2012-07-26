@@ -10,10 +10,14 @@ class LambertProjection(GenericProjection):
 		self.phi2 = math.radians(60)
 		self.projection_type = self.ProjectionType.Conic
 		self.precompute_values()
+#		self.last_x = 0
+#		self.last_y = 0
 		
 			
 	def get_coords(self, x, y):
 		
+#		last_x = x
+#		last_y = y
 		val = math.pi/4 + y/2
 		if round(val,4) == 0.0000:
 			val = 0.00001
@@ -21,7 +25,7 @@ class LambertProjection(GenericProjection):
 			val = 1.5707
 		r = self.F * math.pow( mpmath.cot(val) , self.n)
 		new_x = r * math.sin(self.n*x)	
-		new_y = self.r0 - r * math.cos(self.n * x)					
+		new_y = - r * math.cos(self.n * x)					
 		
 		return 7*new_x, 7*new_y
 	
@@ -33,5 +37,5 @@ class LambertProjection(GenericProjection):
 		
 	def precompute_values(self):
 		self.n = (math.log(math.cos(self.phi1) * mpmath.sec(self.phi2)))/	math.log(math.tan(math.pi/4 + self.phi2/2) * mpmath.cot(math.pi/4 + self.phi1/2))
-		self.F = (math.cos(self.phi1) * math.tan(math.pi / 4 + self.phi1 / 2))/ self.n
-		self.r0 = self.F * math.pow( mpmath.cot(math.pi/4 + math.radians(self.phi1)/2 ), self.n)
+		self.F = (math.cos(self.phi1) * math.pow(math.tan(math.pi / 4 + self.phi1 / 2), self.n))/ self.n
+		#self.r0 = self.F * math.pow( mpmath.cot(math.pi/4 + self.last_y	/2 ), self.n)

@@ -22,8 +22,8 @@ class ConfigurationPanel(wx.Panel):
         
         self.slider_phi1 = wx.Slider(self.panel, minValue=0, maxValue=89, style=wx.SL_HORIZONTAL)
         self.slider_phi2 = wx.Slider(self.panel, minValue=0, maxValue=89, style=wx.SL_HORIZONTAL)
-        self.slider_phi1.SetValue(projection.phi1)
-        self.slider_phi2.SetValue(projection.phi2)
+        self.slider_phi1.SetValue(30)
+        self.slider_phi2.SetValue(60)
         
         self.Bind(wx.EVT_SLIDER, self.on_update)
         
