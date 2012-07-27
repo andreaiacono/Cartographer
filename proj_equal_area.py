@@ -10,7 +10,7 @@ class EqualAreaProjection(GenericProjection):
 
 
 	def get_coords(self, x, y):
-		return math.degrees(x) * self.cos_standard_latitude, 120 * math.sin(y) * self.sec_standard_latitude
+		return 1.5 * math.degrees(x) * self.cos_standard_latitude, 100 * math.sin(y) * self.sec_standard_latitude
 
 	def set_standard_latitude(self, val):
 		self.cos_standard_latitude = math.cos(val)
