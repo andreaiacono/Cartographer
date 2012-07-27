@@ -23,7 +23,6 @@ class AlbersProjection(GenericProjection):
 	def set_phi(self, phi1, phi2):
 		self.phi1 = phi1
 		self.phi2 = phi2
-		print "phi1=" + str(self.phi1) + " phi2=" + str(self.phi2)
 		self.precompute_values()
 
 		

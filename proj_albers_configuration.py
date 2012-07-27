@@ -20,9 +20,11 @@ class ConfigurationPanel(wx.Panel):
         
         label_phi1 = wx.StaticText(self.panel, label="Standard Parallel #1")
         label_phi2 = wx.StaticText(self.panel, label="Standard Parallel #2")
-        
-        self.slider_phi1 = wx.Slider(self.panel, minValue=0, maxValue=89, value=30, style=wx.SL_HORIZONTAL)
-        self.slider_phi2 = wx.Slider(self.panel, minValue=0, maxValue=89, value=60, style=wx.SL_HORIZONTAL)
+
+        self.phi1_id = wx.NewId()
+        self.phi2_id = wx.NewId()
+        self.slider_phi1 = wx.Slider(self.panel, id=self.phi1_id, minValue=0, maxValue=88, value=30, style=wx.SL_HORIZONTAL)
+        self.slider_phi2 = wx.Slider(self.panel, id=self.phi2_id, minValue=1, maxValue=89, value=60, style=wx.SL_HORIZONTAL)
         
         self.Bind(wx.EVT_SLIDER, self.on_update)
         
@@ -35,15 +37,16 @@ class ConfigurationPanel(wx.Panel):
         
     def on_update(self, event):
         
-        #print event.GetSource()
-#        # TODO: if slider 1 is moving, adjust slider2, else the opposite
-#        if self.slider_phi1.GetValue() >= self.slider_phi2.GetValue():
-#            self.slider_phi1.SetValue(self.slider_phi1.GetValue()+1)
-#        
-#        elif self.slider_phi2.GetValue() <= self.slider_phi1.GetValue():
-#            self.slider_phi2.SetValue(self.slider_phi1.GetValue()+1)
-#        
-        print "setting values phi1=" + str(self.slider_phi1.GetValue()) + " phi2=" + str(self.slider_phi2.GetValue())
+          # if slider 1 is moving, adjust slider2
+        if event.GetEventObject().GetId() == self.phi1_id:
+            if self.slider_phi1.GetValue() >= self.slider_phi2.GetValue():
+                self.slider_phi2.SetValue(self.slider_phi1.GetValue()+1)
+                
+        # if slider 2 is moving, adjust slider1
+        elif event.GetEventObject().GetId() == self.phi2_id:
+            if self.slider_phi2.GetValue() <= self.slider_phi1.GetValue():
+                self.slider_phi1.SetValue(self.slider_phi2.GetValue()-1)
+        
         self.projection.set_phi(math.radians(self.slider_phi1.GetValue()), math.radians(self.slider_phi2.GetValue()))
         self.cartographer.projection_panel.Refresh()
         self.cartographer.position_canvas.set_standard_parallel1(self.slider_phi1.GetValue())
