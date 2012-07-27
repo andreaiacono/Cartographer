@@ -186,7 +186,12 @@ class PositionCanvas(GLCanvas):
         if (self.earthx == 0):
             self.earthx = 0.0001
         phi = math.atan(math.radians(self.earthy / math.radians(self.earthx)))
-        theta = math.acos(math.radians(self.earthz / r))
+        den = math.radians(self.earthz / r)
+        if den < -1:
+            den = -1
+        elif den > 1:
+            den = 1
+        theta = math.acos(den)
         angle = 2 * math.pi / num
         for i in range (0, num):
             for j in range (0, num):
