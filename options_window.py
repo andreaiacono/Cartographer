@@ -3,11 +3,7 @@ import wx
 class Options(wx.Frame):
 
 	def __init__(self, parent, cartographer):
-<<<<<<< HEAD
-		super(Options, self).__init__(parent, title="Options", size=(500, 350))
-=======
 		super(Options, self).__init__(parent, title="Options", size=(500, 320))
->>>>>>> f7e6717696eb402e724a542a034318a4ff2c9826
 		self.cartographer = cartographer
 		panel = wx.Panel(self)
 		
@@ -19,11 +15,8 @@ class Options(wx.Frame):
 		empty_label = wx.StaticText(panel, label="")
 		label_grid_res = wx.StaticText(panel, label="Grid Resolution")
 		
-		label_zoom = wx.StaticText(panel, label="Zoom") 
-		
 		self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale, style=wx.SL_HORIZONTAL)
 		self.slider_grid_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale, style=wx.SL_HORIZONTAL)
-		self.slider_zoom = wx.Slider(panel, minValue=15, maxValue=360, value=360, style=wx.SL_HORIZONTAL)
 		self.slider_proj_res.SetValue(cartographer.projection_panel.resolution)
 		self.slider_grid_res.SetValue(cartographer.projection_panel.grid_resolution)
 		
@@ -33,14 +26,8 @@ class Options(wx.Frame):
 		label_meridian_number = wx.StaticText(panel, label="\nDraw a meridian every ") 
 		label_meridian_number_end = wx.StaticText(panel, label="\ndegrees") 
 		
-<<<<<<< HEAD
 		self.slider_parallel_number = wx.Slider(panel, minValue=1, maxValue=90, value=30, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
 		self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=180, value=30, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
-=======
-		self.slider_parallel_number = wx.Slider(panel, minValue=1, maxValue=90, value=15, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
-		self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=180, value=15, style=wx.SL_HORIZONTAL| wx.SL_LABELS)
->>>>>>> f7e6717696eb402e724a542a034318a4ff2c9826
-		
 
 		self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame') 
 		self.check_draw_grid = wx.CheckBox(panel, label='Draw Grid') 
@@ -58,7 +45,6 @@ class Options(wx.Frame):
 		self.Bind(wx.EVT_CHECKBOX, self.on_slider_change)
 		
 		fgs.AddMany([
-					 (label_zoom), (self.slider_zoom, 1, wx.EXPAND), (empty_label), 
 					 (label_res), (self.slider_proj_res, 1, wx.EXPAND), (empty_label), 
 					 (self.check_draw_frame, 1, wx.EXPAND), (empty_label),  (empty_label), 
 					 (self.check_draw_grid, 1, wx.EXPAND), (empty_label),  (empty_label), 
@@ -66,12 +52,8 @@ class Options(wx.Frame):
 					 (label_meridian_number), (self.slider_meridian_number, 1, wx.EXPAND), (label_meridian_number_end),
 					 (label_parallel_number), (self.slider_parallel_number, 1, wx.EXPAND), (label_parallel_number_end),
 					 (self.check_draw_specials, 1, wx.EXPAND), (empty_label), (empty_label), 
-<<<<<<< HEAD
 					 (self.check_show_countries, 1, wx.EXPAND), (empty_label), (empty_label),
 					 (self.check_draw_tissot, 1, wx.EXPAND), (empty_label), (empty_label)])
-=======
-					 (self.check_show_countries, 1, wx.EXPAND), (empty_label), (empty_label) ])
->>>>>>> f7e6717696eb402e724a542a034318a4ff2c9826
 		
 		fgs.AddGrowableCol(1, 1)
 		
@@ -80,7 +62,6 @@ class Options(wx.Frame):
 		
 	def on_slider_change(self, event):
 		
-		self.cartographer.projection_panel.set_zoom(self.slider_zoom.GetValue())
 		self.cartographer.projection_panel.set_resolution(self.slider_proj_res.GetValue())
 		self.cartographer.projection_panel.set_grid_resolution(self.slider_grid_res.GetValue())
 		self.cartographer.projection_panel.set_paint_frame(self.check_draw_frame.GetValue())
