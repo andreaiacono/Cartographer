@@ -36,6 +36,7 @@ class ConfigurationPanel(wx.Panel):
         
     def on_update(self, event):
         
+        print "update phi1=" + str(self.slider_phi1.GetValue()) + " phi2=" + str(self.slider_phi2.GetValue())
         #print event.GetSource()
         # TODO: if slider 1 is moving, adjust slider2, else the opposite
         if self.slider_phi1.GetValue() >= self.slider_phi2.GetValue():

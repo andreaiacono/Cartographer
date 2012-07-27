@@ -19,15 +19,20 @@ class LambertProjection(GenericProjection):
 #		last_x = x
 #		last_y = y
 		val = math.pi/4 + y/2
+		#print "val="+ str(round(val, 4))
 		if round(val,4) == 0.0000:
 			val = 0.00001
-		if round(val, 4) == 1.5708:
+		elif round(val, 4) > 1.5708:
 			val = 1.5707
+		elif round(val, 4) < 0:
+			return -10000, -10000
+		#print "val="+ str(round(val, 4))
+		
 		r = self.F * math.pow( mpmath.cot(val) , self.n)
 		new_x = r * math.sin(self.n*x)	
 		new_y = - r * math.cos(self.n * x)					
 		
-		return 7*new_x, 7*new_y
+		return 80*new_x, 80*new_y
 	
 	def set_phi(self, phi1, phi2):
 		self.phi1 = math.radians(phi1)

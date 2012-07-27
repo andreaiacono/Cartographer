@@ -10,11 +10,11 @@ class GenericProjection():
     #    draws a frame of the map 
     def draw_frame(self, width, height, projection_panel, dc):
         pass
-#        dc.SetPen(wx.Pen("black", 2))
-#        projection_panel.draw_parallel(-180, width, height, False, dc)
-#        projection_panel.draw_parallel(180, width, height, False, dc)
-#        projection_panel.draw_meridian(-90, width, height, False, dc)
-#        projection_panel.draw_meridian(90, width, height, False, dc)
+        dc.SetPen(wx.Pen("black", 2))
+        projection_panel.draw_parallel(-180, width, height, False, dc)
+        projection_panel.draw_parallel(180, width, height, False, dc)
+        projection_panel.draw_meridian(-90, width, height, False, dc)
+        projection_panel.draw_meridian(90, width, height, False, dc)
         
 
     class ProjectionType:
