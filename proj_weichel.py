@@ -14,6 +14,6 @@ class WeichelProjection(GenericProjection):
 		x = r * math.cos(theta)
 		y = r * math.sin(theta)
 		
-		return 50 * x, 50 * y 
+		return 85 * x, 85 * y 
 
 	

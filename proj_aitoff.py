@@ -12,6 +12,6 @@ class AitoffProjection(GenericProjection):
 		z = math.acos(cos_y * math.cos(x/2))
 		if z == 0:
 			z = 0.000001
-		return 50 * z * cos_y * math.sin(x / 2) / math.sin(z), 50 * z * math.sin(y) / math.sin(z) 
+		return 110 * z * cos_y * math.sin(x / 2) / math.sin(z), 110 * z * math.sin(y) / math.sin(z) 
 
 	
