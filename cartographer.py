@@ -2,12 +2,15 @@ import options_window
 import panel_position
 import panel_projection
 import proj_aitoff
+import proj_albers
+import proj_albers_configuration
 import proj_azimuthal_equidistant
 import proj_azimuthal_orthographic
 import proj_collignon
 import proj_eckertIV
 import proj_empty_configuration
 import proj_equal_area
+import proj_equal_area_configuration
 import proj_lambert
 import proj_lambert_configuration
 import proj_mercator
@@ -15,12 +18,8 @@ import proj_miller
 import proj_mollweide
 import proj_sinusoidal
 import proj_stereographic
-import proj_stereographic_configuration
 import proj_weichel
 import wx
-import proj_equal_area_configuration
-import proj_albers
-import proj_albers_configuration
 
 
 class CartographerFrame(wx.Frame):
@@ -259,12 +258,12 @@ class CartographerFrame(wx.Frame):
 	def SetLambertProjection(self, event):
 		name = "Lambert projection"
 		proj = proj_lambert.LambertProjection()
-		self.replace_projection(name, proj,  proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
+		self.replace_projection(name, proj, proj_lambert_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 		
 	def SetAlbersProjection(self, event):
 		name = "Albers projection"
 		proj = proj_albers.AlbersProjection()
-		self.replace_projection(name, proj,  proj_albers_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
+		self.replace_projection(name, proj, proj_albers_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
 		
 	def SetAzimuthalOrtographicProjection(self, event):
 		name = "Azimuthal ortographic projection"
@@ -276,15 +275,14 @@ class CartographerFrame(wx.Frame):
 	
 	def SetStereographicProjection(self, event):
 		name = "Stereographic projection"
-		proj = proj_stereographic.StereographicProjection()
-		self.replace_projection(name, proj, proj_stereographic_configuration.ConfigurationPanel(self.settings_splitter, -1, self, proj))
+		self.replace_projection(name, proj_stereographic.StereographicProjection() , proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
 	def SetSinusoidalProjection(self, event):
 		name = "Sinusoidal projection"
 		self.replace_projection(name, proj_sinusoidal.SinusoidalProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 
 	def SetEckertIVProjection(self, event):
-		name="Eckert IV Projection"
+		name = "Eckert IV Projection"
 		self.replace_projection(name, proj_eckertIV.EckertIVProjection(), proj_empty_configuration.EmptyPanel(self.settings_splitter, name))
 		
 	def SetCollignonProjection(self, event):
