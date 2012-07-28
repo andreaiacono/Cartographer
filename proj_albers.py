@@ -15,10 +15,11 @@ class AlbersProjection(GenericProjection):
 		
 		rho = math.sqrt(self.C - (2 * self.n * math.sin(y))) / self.n
 		theta = self.n * x
-		new_x = 10 * rho * math.sin(theta)	
-		new_y = 10 * -rho * math.cos(theta)					
+		new_x = rho * math.sin(theta)	
+		new_y = -rho * math.cos(theta)  
 		
-		return 7 * new_x, 7 * new_y
+		### todo
+		return 70 * new_x, 70 * new_y + 1 / self.phi2 * self.phi2
 	
 	def set_phi(self, phi1, phi2):
 		self.phi1 = phi1

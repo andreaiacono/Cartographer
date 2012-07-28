@@ -138,7 +138,7 @@ class PositionCanvas(GLCanvas):
         if self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Cylindric or self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.PseudoCylindric:
             cyl_size = 6
             glPushMatrix()
-            glTranslatef(0.0, 0.0, -self.earth_radius * cyl_size/2)
+            glTranslatef(0.0, 0.0, -self.earth_radius * cyl_size / 2)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)            
             glColor4f(1.0, 1.0, 1.0, 0.2)
@@ -219,10 +219,15 @@ class PositionCanvas(GLCanvas):
         if (self.earthx == 0):
             self.earthx = 0.0001
         phi = math.atan(math.radians(self.earthy / math.radians(self.earthx)))
-        theta = math.acos(math.radians(self.earthz / r))
+        den = math.radians(self.earthz / r)
+        if den < -1:
+            den = -1
+        elif den > 1:
+            den = 1
+        theta = math.acos(den)
         angle = 2 * math.pi / num
         for i in range (0, num):
-            for j in range (0, num/2):
+            for j in range (0, num / 2):
             
                 x = 0#r * math.sin((theta + i) * angle) * math.cos((phi + j) * angle)
                 y = 0#r * math.sin((theta + i) * angle) * math.sin((phi + j) * angle)

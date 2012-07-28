@@ -39,11 +39,11 @@ class ProjectionPanel(wx.Panel):
 		
 		self.resolution_scale = 10
 
-		self.set_resolution(self.resolution_scale / 2)
+		self.set_resolution(self.resolution_scale)
 		self.set_grid_resolution(self.resolution_scale / 2)
-		self.set_paint_grid(True)
-		self.set_paint_grid_specials(True)
-		self.set_paint_frame(True)
+		self.set_paint_grid(False)
+		self.set_paint_grid_specials(False)
+		self.set_paint_frame(False)
 		self.set_draw_tissot(False)
 		
 		self.zoom = 360
@@ -204,10 +204,11 @@ class ProjectionPanel(wx.Panel):
 		
 	def compute_size(self):	
 		self.width, self.height = self.GetSizeTuple()
+		print "width=" + str(self.width) + " height=" + str(self.height)
 		visible_height = self.zoom
 		visible_width = self.zoom
 		
-		if self.width > 2 * self.height:
+		if self.width >= self.height:
 			self.mf = self.height / float(visible_height)
 			self.tx = self.mf * visible_width / 2 + (self.width - self.mf * visible_width) / 2
 			self.ty = self.mf * visible_height / 2
