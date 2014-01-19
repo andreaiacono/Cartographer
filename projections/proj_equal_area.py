@@ -1,6 +1,9 @@
-from proj_generic import GenericProjection
 import math
+
 import mpmath
+
+from projections.proj_generic import GenericProjection
+
 
 class EqualAreaProjection(GenericProjection):
 

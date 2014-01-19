@@ -1,5 +1,6 @@
-from proj_generic import GenericProjection
 import math
+
+from projections.proj_generic import GenericProjection
 
 
 class StereographicProjection(GenericProjection):
