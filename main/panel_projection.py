@@ -204,7 +204,6 @@ class ProjectionPanel(wx.Panel):
 		
 	def compute_size(self):	
 		self.width, self.height = self.GetSizeTuple()
-		print "width=" + str(self.width) + " height=" + str(self.height)
 		visible_height = self.zoom
 		visible_width = self.zoom
 		
