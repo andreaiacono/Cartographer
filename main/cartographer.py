@@ -3,7 +3,7 @@ import wxversion
 wxversion.select('3.0')
 import wx
 
-from main import panel_projection, panel_position, options_window
+from main import panel_projection, panel_earth, options_window
 
 from os import listdir
 from os.path import isfile, join
@@ -39,7 +39,7 @@ class CartographerFrame(wx.Frame):
         self.rotationz = 0
 
         wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer", pos=wx.DefaultPosition,
-                          size=wx.Size(640, 480))
+                          size=wx.Size(800, 600))
         wx.EVT_CLOSE(self, self.OnQuit)
         wx.EVT_KEY_DOWN(self, self.OnKeyDown)
 
@@ -50,16 +50,16 @@ class CartographerFrame(wx.Frame):
 
         self.projection_panel = panel_projection.ProjectionPanel(top_splitter, -1, self)
         self.projection_panel.projection = proj_mercator.MercatorProjection()
-        top_splitter.SplitHorizontally(self.settings_splitter, self.projection_panel)
-        top_splitter.SetSashGravity(0.3)
+        top_splitter.SplitVertically(self.projection_panel, self.settings_splitter)
+        top_splitter.SetSashGravity(0.65)
 
         self.configurationPanel = proj_empty_configuration.EmptyPanel(self.settings_splitter, "Mercator")
-        self.position_canvas = panel_position.PositionCanvas(self.settings_splitter, self)
-        self.settings_splitter.SplitVertically(self.position_canvas, self.configurationPanel)
+        self.earth_canvas = panel_earth.EarthCanvas(self.settings_splitter, self)
+        self.settings_splitter.SplitHorizontally(self.earth_canvas, self.configurationPanel)
         self.settings_splitter.SetSashGravity(0.5)
 
         wx.EVT_KEY_DOWN(self.configurationPanel, self.OnKeyDown)
-        wx.EVT_KEY_DOWN(self.position_canvas, self.OnKeyDown)
+        wx.EVT_KEY_DOWN(self.earth_canvas, self.OnKeyDown)
         wx.EVT_KEY_DOWN(self.projection_panel, self.OnKeyDown)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -81,7 +81,7 @@ class CartographerFrame(wx.Frame):
         file_menu.Append(ID_QUIT, "&Quit", "Quit Cartographer")
         wx.EVT_MENU(self, ID_QUIT, self.OnQuit)
 
-        menu_bar.Append(file_menu, "&File");
+        menu_bar.Append(file_menu, "&File")
 
         menu_proj = wx.Menu()
 
@@ -157,7 +157,7 @@ class CartographerFrame(wx.Frame):
         menu_azimuthal.Append(ID_PROJ_WIECHEL, "&Weichel Projection", "Shows a Weichel projection")
         wx.EVT_MENU(self, ID_PROJ_WIECHEL, self.SetWeichelProjection)
 
-        menu_bar.Append(menu_proj, "&Projections");
+        menu_bar.Append(menu_proj, "&Projections")
 
         menu_views = wx.Menu()
 
@@ -188,14 +188,7 @@ class CartographerFrame(wx.Frame):
         self.ID_ANTARCTICA = wx.NewId()
         menu_views.Append(self.ID_ANTARCTICA, "Center map on An&tarctica", "Centers the map on Antarctica")
         wx.EVT_MENU(self, self.ID_ANTARCTICA, self.Center)
-
         menu_bar.Append(menu_views, "&Center")
-
-        menu_tools = wx.Menu()
-        ID_OPTIONS = wx.NewId()
-        menu_tools.Append(ID_OPTIONS, "&Option", "Shows the options window")
-        wx.EVT_MENU(self, ID_OPTIONS, self.OnOptions)
-        menu_bar.Append(menu_tools, "&Tools")
 
         menu_shapes = wx.Menu()
         for shape in self.read_shapes():
@@ -206,6 +199,12 @@ class CartographerFrame(wx.Frame):
 
         self.setShape(shapeId)
         menu_bar.Append(menu_shapes, "&Shapes")
+
+        menu_tools = wx.Menu()
+        ID_OPTIONS = wx.NewId()
+        menu_tools.Append(ID_OPTIONS, "&Option", "Shows the options window")
+        wx.EVT_MENU(self, ID_OPTIONS, self.OnOptions)
+        menu_bar.Append(menu_tools, "&Tools")
 
         menu_about = wx.Menu()
         ID_INFO = wx.NewId()
@@ -267,10 +266,10 @@ class CartographerFrame(wx.Frame):
 
     def refresh(self):
         self.projection_panel.set_coordinates(self.rotationx, self.rotationy, self.rotationz)
-        self.position_canvas.set_earth_coordinates(self.rotationx, self.rotationy, self.rotationz)
+        self.earth_canvas.set_earth_coordinates(self.rotationx, self.rotationy, self.rotationz)
 
         self.projection_panel.Refresh()
-        self.position_canvas.Refresh()
+        self.earth_canvas.Refresh()
 
     def SetMercatorProjection(self, event):
         name = "Mercator projection"

@@ -4,8 +4,8 @@ import wx
 class ConfigurationPanel(wx.Panel):
     
     def __init__(self, parent, window_id, cartographer, projection):
-    
-        sty = wx.NO_BORDER
+
+        sty = wx.SUNKEN_BORDER
         wx.Window.__init__(self, parent, window_id, style=sty, size=wx.Size(200, 80))
         self.parent = parent
         self.cartographer = cartographer
@@ -17,8 +17,8 @@ class ConfigurationPanel(wx.Panel):
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         fgs = wx.FlexGridSizer(2, 2, 10, 25)
         
-        label_phi1 = wx.StaticText(self.panel, label="Standard Parallel #1")
-        label_phi2 = wx.StaticText(self.panel, label="Standard Parallel #2")
+        label_phi1 = wx.StaticText(self.panel, label="Stand. Parallel #1")
+        label_phi2 = wx.StaticText(self.panel, label="Stand. Parallel #2")
         
         self.phi1_id = wx.NewId()
         self.phi2_id = wx.NewId()

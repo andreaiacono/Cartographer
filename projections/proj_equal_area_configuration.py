@@ -5,8 +5,8 @@ import wx
 class ConfigurationPanel(wx.Panel):
     
     def __init__(self, parent, window_id, cartographer, projection):
-    
-        sty = wx.NO_BORDER
+
+        sty = wx.SUNKEN_BORDER
         wx.Window.__init__(self, parent, window_id, style=sty, size=wx.Size(200, 80))
         self.parent = parent
         self.cartographer = cartographer
@@ -15,20 +15,20 @@ class ConfigurationPanel(wx.Panel):
         self.panel = wx.Panel(self)
                     
         hbox = wx.BoxSizer(wx.HORIZONTAL)
-        fgs = wx.FlexGridSizer(rows=7, cols=3, hgap=10, vgap=15)
+        fgs = wx.FlexGridSizer(rows=7, cols=2, hgap=5, vgap=10)
         
         label_standard = wx.StaticText(self.panel, label="\nStandard Latitude")
         self.label_value = wx.StaticText(self.panel, label="\n 40.0°")
         self.slider_lat = wx.Slider(self.panel, minValue=0, maxValue=8000, value=4000, style=wx.SL_HORIZONTAL)
-        fgs.AddMany([(label_standard), (self.label_value), (self.slider_lat, 1, wx.EXPAND)])
+        fgs.AddMany([label_standard, (wx.StaticText(self.panel, label="")), (self.slider_lat, 1, wx.EXPAND), self.label_value])
         
         self.projections = {}
-        self.projections['Balthasart'] = 50.0
-        self.projections['Behrmann'] = 30.0
-        self.projections['Gall'] = 45.0
         self.projections['Lambert'] = 0.0
-        self.projections['Peters'] = 44.138
+        self.projections['Behrmann'] = 30.0
         self.projections['Trystan Edwards'] = 37.383
+        self.projections['Peters'] = 44.138
+        self.projections['Gall'] = 45.0
+        self.projections['Balthasart'] = 50.0
         self.radiobuttons = {}
         
         style = wx.RB_GROUP
@@ -42,7 +42,7 @@ class ConfigurationPanel(wx.Panel):
         self.Bind(wx.EVT_RADIOBUTTON, self.on_radiobutton_pressed)
         self.Bind(wx.EVT_SLIDER, self.on_slider_change)
         
-        fgs.AddGrowableCol(2, 1)
+        # fgs.AddGrowableCol(2, 1)
         hbox.Add(fgs, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
         self.panel.SetSizer(hbox)
         

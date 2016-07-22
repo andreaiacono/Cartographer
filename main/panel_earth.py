@@ -8,12 +8,12 @@ import wx
 
 
 
-class PositionCanvas(wx.Panel):
+class EarthCanvas(wx.Panel):
 # class PositionCanvas(GLCanvas):
 
     # def __init__(self, parent, cartographer):
     def __init__(self, parent, cartographer):
-        wx.Window.__init__(self, parent, -1)
+        wx.Window.__init__(self, parent, -1, style=wx.SUNKEN_BORDER)
         self.SetBackgroundColour((11, 11, 11))
 
         # GLCanvas.__init__(self, parent, -1, attribList=[wx.glcanvas.WX_GL_DOUBLEBUFFER])
@@ -285,12 +285,12 @@ class PositionCanvas(wx.Panel):
     #
     #         self.Refresh()
     #
-    # def set_standard_parallel1(self, value):
-    #     self.standard_parallel1 = value
-    #
-    # def set_standard_parallel2(self, value):
-    #     self.standard_parallel2 = value
-    #
+    def set_standard_parallel1(self, value):
+        self.standard_parallel1 = value
+
+    def set_standard_parallel2(self, value):
+        self.standard_parallel2 = value
+
     # def draw_circle(self, y, radius, smoothness):
     #     mp = 2 * math.pi / smoothness
     #     glPushMatrix()

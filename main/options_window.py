@@ -3,7 +3,7 @@ import wx
 
 class Options(wx.Frame):
     def __init__(self, parent, cartographer):
-        super(Options, self).__init__(parent, title="Options", size=(500, 320))
+        super(Options, self).__init__(parent, title="Options", size=(500, 300))
         self.cartographer = cartographer
         panel = wx.Panel(self)
 
@@ -11,16 +11,17 @@ class Options(wx.Frame):
 
         fgs = wx.FlexGridSizer(8, 3)
         fgs.AddGrowableCol(1, 1)
-        label_res = wx.StaticText(panel, label="Projection Resolution  -    HiRes")
+        label_res = wx.StaticText(panel, label="Projection Resolution       HiRes")
         label_res_end = wx.StaticText(panel, label=" LowRes")
-        label_grid_res = wx.StaticText(panel, label="Grid Resolution")
+        # label_grid_res = wx.StaticText(panel, label="Grid Resolution                   HiRes")
+        # label_grid_res_end = wx.StaticText(panel, label=" LowRes")
 
         self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale,
                                          style=wx.SL_HORIZONTAL)
-        self.slider_grid_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale,
-                                         style=wx.SL_HORIZONTAL)
+        # self.slider_grid_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale,
+        #                                  style=wx.SL_HORIZONTAL)
         self.slider_proj_res.SetValue(cartographer.projection_panel.resolution)
-        self.slider_grid_res.SetValue(cartographer.projection_panel.grid_resolution)
+        # self.slider_grid_res.SetValue(cartographer.projection_panel.grid_resolution)
 
         label_parallel_number = wx.StaticText(panel, label="\nDraw a parallel every ")
         label_parallel_number_end = wx.StaticText(panel, label="\n degrees")
@@ -33,7 +34,7 @@ class Options(wx.Frame):
                                                 style=wx.SL_HORIZONTAL | wx.SL_LABELS)
 
         self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame')
-        self.check_draw_grid = wx.CheckBox(panel, label='Draw Grid')
+        self.check_draw_grid = wx.CheckBox(panel, label='Draw meridians and parallels')
         self.check_draw_specials = wx.CheckBox(panel, label='Draw Special Parallels')
         self.check_draw_tissot = wx.CheckBox(panel, label="Draw Tissot's Indicatrix")
 
@@ -57,10 +58,14 @@ class Options(wx.Frame):
         fgs.Add(wx.StaticText(panel))
         fgs.Add(wx.StaticText(panel))
 
-        fgs.Add(label_grid_res, 1, wx.EXPAND)
-        fgs.Add(self.slider_grid_res, 1, wx.EXPAND)
-        fgs.Add(wx.StaticText(panel))
-
+        # fgs.Add(label_grid_res, 1, wx.EXPAND)
+        # fgs.Add(self.slider_grid_res, 1, wx.EXPAND)
+        # fgs.Add(label_grid_res_end)
+        #
+        # fgs.Add(label_grid_res, 1, wx.EXPAND)
+        # fgs.Add(self.slider_grid_res, 1, wx.EXPAND)
+        # fgs.Add(label_grid_res_end)
+        #
         fgs.Add(label_meridian_number)
         fgs.Add(self.slider_meridian_number, 1, wx.EXPAND)
         fgs.Add(label_meridian_number_end)
@@ -94,7 +99,7 @@ class Options(wx.Frame):
     def on_slider_change(self, event):
 
         self.cartographer.projection_panel.set_resolution(self.slider_proj_res.GetValue())
-        self.cartographer.projection_panel.set_grid_resolution(self.slider_grid_res.GetValue())
+        # self.cartographer.projection_panel.set_grid_resolution(self.slider_grid_res.GetValue())
         self.cartographer.projection_panel.set_paint_frame(self.check_draw_frame.GetValue())
         self.cartographer.projection_panel.set_paint_grid(self.check_draw_grid.GetValue())
         self.cartographer.projection_panel.set_draw_tissot(self.check_draw_tissot.GetValue())
