@@ -13,17 +13,7 @@ class ProjectionPanel(wx.Panel):
         wx.Window.__init__(self, parent, window_id, style=sty)
         self.parent = parent
         self.cartographer = cartographer
-
-        countriesShapeReader = lib.shapefile.Reader("shapes/ne_110m_admin_0_countries.shp")
-        self.countries = countriesShapeReader.shapes()
-
-        continentsShapeReader = lib.shapefile.Reader("shapes/110m_land.shp")
-        self.continents = continentsShapeReader.shapes()
-
-        hiResShapeReader = lib.shapefile.Reader("shapes/10m_land.shp")
-        self.hires = hiResShapeReader.shapes()
-
-        self.set_shapes(0)
+        self.shapes = self.cartographer.getShape()
 
         wx.EVT_PAINT(self, self.OnPaint)
         wx.EVT_SIZE(self, self.OnSize)
@@ -64,6 +54,9 @@ class ProjectionPanel(wx.Panel):
         self.Bind(wx.EVT_RIGHT_UP, self.OnMouseUp)
         self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
         self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
+
+    def setShape(self, shape):
+        self.shapes = shape
 
     def OnMouseDown(self, evt):
         self.CaptureMouse()
@@ -171,17 +164,6 @@ class ProjectionPanel(wx.Panel):
 
     def set_grid_resolution(self, grid_resolution):
         self.grid_resolution = grid_resolution
-
-    def set_shapes(self, shape_type):
-
-        self.shape_type = shape_type
-
-        if shape_type == 0:
-            self.shapes = self.continents
-        elif shape_type == 1:
-            self.shapes = self.countries
-        else:
-            self.shapes = self.hires
 
     def refresh_window(self):
         dc = wx.PaintDC(self)

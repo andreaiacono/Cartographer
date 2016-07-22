@@ -1,9 +1,12 @@
 import wxversion
+
 wxversion.select('3.0')
 import wx
 
 from main import panel_projection, panel_position, options_window
 
+from os import listdir
+from os.path import isfile, join
 from projections import proj_aitoff
 from projections import proj_albers
 from projections import proj_albers_configuration
@@ -23,9 +26,18 @@ from projections import proj_sinusoidal
 from projections import proj_stereographic
 from projections import proj_weichel
 
+import lib.euclid
+import lib.shapefile
+
 
 class CartographerFrame(wx.Frame):
     def __init__(self):
+        self.shape = ""
+        self.id_shapes = {}
+        self.rotationx = 0
+        self.rotationy = 0
+        self.rotationz = 0
+
         wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer", pos=wx.DefaultPosition,
                           size=wx.Size(640, 480))
         wx.EVT_CLOSE(self, self.OnQuit)
@@ -177,28 +189,32 @@ class CartographerFrame(wx.Frame):
         menu_views.Append(self.ID_ANTARCTICA, "Center map on An&tarctica", "Centers the map on Antarctica")
         wx.EVT_MENU(self, self.ID_ANTARCTICA, self.Center)
 
-        menu_bar.Append(menu_views, "&Center");
+        menu_bar.Append(menu_views, "&Center")
 
         menu_tools = wx.Menu()
-
         ID_OPTIONS = wx.NewId()
         menu_tools.Append(ID_OPTIONS, "&Option", "Shows the options window")
         wx.EVT_MENU(self, ID_OPTIONS, self.OnOptions)
+        menu_bar.Append(menu_tools, "&Tools")
 
-        menu_bar.Append(menu_tools, "&Tools");
+        menu_shapes = wx.Menu()
+        for shape in self.read_shapes():
+            shapeId = wx.NewId()
+            self.id_shapes[shapeId] = shape
+            menu_shapes.Append(shapeId, shape)
+            wx.EVT_MENU(self, shapeId, self.OnSetShape)
+
+        self.setShape(shapeId)
+        menu_bar.Append(menu_shapes, "&Shapes")
+
         menu_about = wx.Menu()
-
         ID_INFO = wx.NewId()
         menu_about.Append(ID_INFO, "&Info", "Shows info")
         wx.EVT_MENU(self, ID_INFO, self.OnInfo)
-
-        menu_bar.Append(menu_about, "&About");
+        menu_bar.Append(menu_about, "&About")
 
         self.SetMenuBar(menu_bar)
         self.SetStatusText("Ready")
-        self.rotationx = 0
-        self.rotationy = 0
-        self.rotationz = 0
 
     def OnOptions(self, event):
         self.options = options_window.Options(None, self)
@@ -236,6 +252,18 @@ class CartographerFrame(wx.Frame):
             self.rotationz += 5
             self.projection_panel.rotationz = self.rotationz
             self.projection_panel.Refresh()
+
+    def OnSetShape(self, event):
+        self.setShape(event.GetId())
+
+    def setShape(self, shape):
+        shape_name = self.id_shapes[shape]
+        self.shape = lib.shapefile.Reader("shapes/" + shape_name + "/" + shape_name + ".shp").shapes()
+        self.projection_panel.setShape(self.shape)
+        self.refresh()
+
+    def getShape(self):
+        return self.shape
 
     def refresh(self):
         self.projection_panel.set_coordinates(self.rotationx, self.rotationy, self.rotationz)
@@ -354,9 +382,10 @@ class CartographerFrame(wx.Frame):
 
     def OnExport(self, event):
 
-        #	 	dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir = "", defaultFile = "", wildcard = "*.png", style = wx.SAVE)
-        #	 	if dlg.ShowModal() != wx.ID_OK:
-        #	 		return
+        dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir="", defaultFile="",
+                            wildcard="*.png", style=wx.SAVE)
+        if dlg.ShowModal() != wx.ID_OK:
+            return
         height = 2000
         width = 4000
         mem = wx.MemoryDC()
@@ -366,7 +395,6 @@ class CartographerFrame(wx.Frame):
 
         proj_panel = panel_projection.ProjectionPanel(self, -1, self)
         proj_panel.projection = self.projection_panel.projection
-        proj_panel.set_shapes(2)
         proj_panel.resolution = 1
         proj_panel.grid_resolution = 1
         proj_panel.set_paint_grid(self.projection_panel.paint_grid)
@@ -384,8 +412,12 @@ class CartographerFrame(wx.Frame):
         mem.Blit(0, 0, 2000, 1000, wx.PaintDC(proj_panel), 0, 0)
         mem.EndDrawing()
 
-        image.SaveFile("/home/andrea/test.png", wx.BITMAP_TYPE_PNG)
+        image.SaveFile(dlg.GetPath(), wx.BITMAP_TYPE_PNG)
         proj_panel.Destroy()
+
+    def read_shapes(self):
+        shapes_dirs = [f for f in listdir("shapes")]
+        return shapes_dirs
 
     def OnInfo(self, event):
 
@@ -409,7 +441,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
         info = wx.AboutDialogInfo()
         info.SetIcon(wx.Icon('img/mercator.jpg', wx.BITMAP_TYPE_JPEG))
         info.SetName('Cartographer')
-        info.SetVersion('1.0')
+        info.SetVersion('0.8')
         info.SetDescription("Cartographer is a simple cartography application for making earth maps in real-time")
         info.SetCopyright('(C) 2012-2016 Andrea Iacono')
         info.SetWebSite('http://www.github.com/andreaiacono/cartographer')

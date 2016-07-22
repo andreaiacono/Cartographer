@@ -9,7 +9,7 @@ class Options(wx.Frame):
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
 
-        fgs = wx.FlexGridSizer(9, 3)
+        fgs = wx.FlexGridSizer(8, 3)
         fgs.AddGrowableCol(1, 1)
         label_res = wx.StaticText(panel, label="Projection Resolution  -    HiRes")
         label_res_end = wx.StaticText(panel, label=" LowRes")
@@ -35,13 +35,11 @@ class Options(wx.Frame):
         self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame')
         self.check_draw_grid = wx.CheckBox(panel, label='Draw Grid')
         self.check_draw_specials = wx.CheckBox(panel, label='Draw Special Parallels')
-        self.check_show_countries = wx.CheckBox(panel, label='Draw Countries Borders')
         self.check_draw_tissot = wx.CheckBox(panel, label="Draw Tissot's Indicatrix")
 
         self.check_draw_frame.SetValue(cartographer.projection_panel.paint_frame)
         self.check_draw_grid.SetValue(cartographer.projection_panel.paint_grid)
         self.check_draw_specials.SetValue(cartographer.projection_panel.paint_grid_specials)
-        self.check_show_countries.SetValue(cartographer.projection_panel.shape_type == 1)
         self.check_draw_tissot.SetValue(cartographer.projection_panel.draw_tissot)
 
         self.Bind(wx.EVT_SLIDER, self.on_slider_change)
@@ -75,10 +73,6 @@ class Options(wx.Frame):
         fgs.Add(wx.StaticText(panel))
         fgs.Add(wx.StaticText(panel))
 
-        fgs.Add(self.check_show_countries, 1, wx.EXPAND)
-        fgs.Add(wx.StaticText(panel))
-        fgs.Add(wx.StaticText(panel))
-
         fgs.Add(self.check_draw_tissot, 1, wx.EXPAND)
         fgs.Add(wx.StaticText(panel))
         fgs.Add(wx.StaticText(panel))
@@ -108,10 +102,6 @@ class Options(wx.Frame):
         self.cartographer.projection_panel.set_meridian_degrees(self.slider_meridian_number.GetValue())
         self.cartographer.projection_panel.set_parallel_degrees(self.slider_parallel_number.GetValue())
 
-        if self.check_show_countries.GetValue():
-            self.cartographer.projection_panel.set_shapes(1)
-        else:
-            self.cartographer.projection_panel.set_shapes(0)
         self.cartographer.projection_panel.compute_size()
         self.cartographer.projection_panel.refresh_window()
 
