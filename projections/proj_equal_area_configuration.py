@@ -15,27 +15,21 @@ class ConfigurationPanel(wx.Panel):
         self.panel = wx.Panel(self)
                     
         hbox = wx.BoxSizer(wx.HORIZONTAL)
-        fgs = wx.FlexGridSizer(rows=7, cols=2, hgap=5, vgap=10)
+        flexi_grid_sizer = wx.FlexGridSizer(rows=7, cols=2, hgap=5, vgap=10)
         
         label_standard = wx.StaticText(self.panel, label="\nStandard Latitude")
         self.label_value = wx.StaticText(self.panel, label="\n 40.0°")
         self.slider_lat = wx.Slider(self.panel, minValue=0, maxValue=8000, value=4000, style=wx.SL_HORIZONTAL)
-        fgs.AddMany([label_standard, (wx.StaticText(self.panel, label="")), (self.slider_lat, 1, wx.EXPAND), self.label_value])
+        flexi_grid_sizer.AddMany([label_standard, (wx.StaticText(self.panel, label="")), (self.slider_lat, 1, wx.EXPAND), self.label_value])
         
-        self.projections = {}
-        self.projections['Lambert'] = 0.0
-        self.projections['Behrmann'] = 30.0
-        self.projections['Trystan Edwards'] = 37.383
-        self.projections['Peters'] = 44.138
-        self.projections['Gall'] = 45.0
-        self.projections['Balthasart'] = 50.0
+        self.projections = {'Lambert': 0.0, 'Behrmann': 30.0, 'Trystan Edwards': 37.383, 'Peters': 44.138, 'Gall': 45.0, 'Balthasart': 50.0}
         self.radiobuttons = {}
         
         style = wx.RB_GROUP
         self.radiobuttons = []
         for item in self.projections:
             rb = wx.RadioButton(self.panel, wx.NewId(), item, style=style)
-            fgs.Add(rb)
+            flexi_grid_sizer.Add(rb)
             self.radiobuttons.append(rb)
             style = 0
         
@@ -43,7 +37,7 @@ class ConfigurationPanel(wx.Panel):
         self.Bind(wx.EVT_SLIDER, self.on_slider_change)
         
         # fgs.AddGrowableCol(2, 1)
-        hbox.Add(fgs, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
+        hbox.Add(flexi_grid_sizer, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
         self.panel.SetSizer(hbox)
         
     def on_radiobutton_pressed(self, event):

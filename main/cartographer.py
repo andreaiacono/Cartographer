@@ -6,7 +6,6 @@ import wx
 from main import panel_projection, panel_earth, options_window
 
 from os import listdir
-from os.path import isfile, join
 from projections import proj_aitoff
 from projections import proj_albers
 from projections import proj_albers_configuration
@@ -29,6 +28,16 @@ from projections import proj_weichel
 import lib.euclid
 import lib.shapefile
 
+ZONES = {
+    wx.NewId(): ("Europe", (20, -5, 35)),
+    wx.NewId(): ("North America", (-90, -45, 0)),
+    wx.NewId(): ("South America", (243, 170, 147)),
+    wx.NewId(): ("Africa", (20, 0, 0)),
+    wx.NewId(): ("Asia", (85, 41, 0)),
+    wx.NewId(): ("Oceania", (130, 0, 330)),
+    wx.NewId(): ("Antarctica", (120, 0, 280))
+}
+
 
 class CartographerFrame(wx.Frame):
     def __init__(self):
@@ -38,8 +47,7 @@ class CartographerFrame(wx.Frame):
         self.rotationy = 0
         self.rotationz = 0
 
-        wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer", pos=wx.DefaultPosition,
-                          size=wx.Size(800, 600))
+        wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer", pos=wx.DefaultPosition, size=wx.Size(800, 600))
         wx.EVT_CLOSE(self, self.OnQuit)
         wx.EVT_KEY_DOWN(self, self.OnKeyDown)
 
@@ -68,9 +76,10 @@ class CartographerFrame(wx.Frame):
         self.options = None
 
         menu_bar = wx.MenuBar()
-
         file_menu = wx.Menu()
 
+
+        ## file menu
         ID_EXPORT = wx.NewId()
         file_menu.Append(ID_EXPORT, "&Export projection as Image", "Export the actual projection as an image")
         wx.EVT_MENU(self, ID_EXPORT, self.OnExport)
@@ -83,113 +92,57 @@ class CartographerFrame(wx.Frame):
 
         menu_bar.Append(file_menu, "&File")
 
+        ## projections menu
         menu_proj = wx.Menu()
-
         menu_cylindrical = wx.Menu()
         menu_proj.AppendMenu(wx.ID_ANY, "&Cylindrical Projections", menu_cylindrical)
+        self.add_projection(menu_cylindrical, "&Mercator", "Shows a Mercator projection", self.SetMercatorProjection)
+        self.add_projection(menu_cylindrical,
+                            "&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)",
+                            "Shows an equal area projection (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)",
+                            self.SetEqualAreaProjection)
+        self.add_projection(menu_cylindrical, "M&iller", "Shows a Miller projection", self.SetMillerProjection)
 
-        ID_PROJ_MERCATOR = wx.NewId()
-        menu_cylindrical.Append(ID_PROJ_MERCATOR, "&Mercator", "Shows a Mercator projection")
-        wx.EVT_MENU(self, ID_PROJ_MERCATOR, self.SetMercatorProjection)
-
-        ID_PROJ_EQUAL_AREA = wx.NewId()
-        menu_cylindrical.Append(ID_PROJ_EQUAL_AREA,
-                                "&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)",
-                                "Shows an equal area projection (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)")
-        wx.EVT_MENU(self, ID_PROJ_EQUAL_AREA, self.SetEqualAreaProjection)
-
-        ID_PROJ_MILLER = wx.NewId()
-        menu_cylindrical.Append(ID_PROJ_MILLER, "M&iller", "Shows a Miller projection")
-        wx.EVT_MENU(self, ID_PROJ_MILLER, self.SetMillerProjection)
-
-        menu_pseudocyl = wx.Menu()
-        menu_proj.AppendMenu(wx.ID_ANY, "P&seudo Cylindrical Projections", menu_pseudocyl)
-
-        ID_PROJ_SINUSOIDAL = wx.NewId()
-        menu_pseudocyl.Append(ID_PROJ_SINUSOIDAL, "&Sinusoidal", "Shows a sinusoidal projection")
-        wx.EVT_MENU(self, ID_PROJ_SINUSOIDAL, self.SetSinusoidalProjection)
-
-        ID_PROJ_ECKERTIV = wx.NewId()
-        menu_pseudocyl.Append(ID_PROJ_ECKERTIV, "&Eckert IV", "Shows an Eckert IV projection")
-        wx.EVT_MENU(self, ID_PROJ_ECKERTIV, self.SetEckertIVProjection)
-
-        ID_PROJ_COLLIGNON = wx.NewId()
-        menu_pseudocyl.Append(ID_PROJ_COLLIGNON, "&Collignon", "Shows a Collignon projection")
-        wx.EVT_MENU(self, ID_PROJ_COLLIGNON, self.SetCollignonProjection)
-
-        ID_PROJ_MOLLWEIDE = wx.NewId()
-        menu_pseudocyl.Append(ID_PROJ_MOLLWEIDE, "M&ollweide", "Shows a Mollweide projection")
-        wx.EVT_MENU(self, ID_PROJ_MOLLWEIDE, self.SetMollweideProjection)
+        menu_pseudocylindrical = wx.Menu()
+        menu_proj.AppendMenu(wx.ID_ANY, "P&seudo Cylindrical Projections", menu_pseudocylindrical)
+        self.add_projection(menu_pseudocylindrical, "&Sinusoidal", "Shows a sinusoidal projection",
+                            self.SetSinusoidalProjection)
+        self.add_projection(menu_pseudocylindrical, "&Eckert IV", "Shows an Eckert IV projection",
+                            self.SetEckertIVProjection)
+        self.add_projection(menu_pseudocylindrical, "&Collignon", "Shows a Collignon projection",
+                            self.SetCollignonProjection)
+        self.add_projection(menu_pseudocylindrical, "M&ollweide", "Shows a Mollweide projection",
+                            self.SetMollweideProjection)
 
         menu_conic = wx.Menu()
         menu_proj.AppendMenu(wx.ID_ANY, "C&onic Projections", menu_conic)
-
-        ID_PROJ_LAMBERT = wx.NewId()
-        menu_conic.Append(ID_PROJ_LAMBERT, "&Lambert", "Shows a Lambert projection")
-        wx.EVT_MENU(self, ID_PROJ_LAMBERT, self.SetLambertProjection)
-
-        ID_PROJ_ALBERS = wx.NewId()
-        menu_conic.Append(ID_PROJ_ALBERS, "&Albers", "Shows a Albers projection")
-        wx.EVT_MENU(self, ID_PROJ_ALBERS, self.SetAlbersProjection)
+        self.add_projection(menu_conic, "&Lambert", "Shows a Lambert projection", self.SetLambertProjection)
+        self.add_projection(menu_conic, "&Albers", "Shows a Albers projection", self.SetAlbersProjection)
 
         menu_azimuthal = wx.Menu()
         menu_proj.AppendMenu(wx.ID_ANY, "A&zimuthal Projections", menu_azimuthal)
-
-        ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC = wx.NewId()
-        menu_azimuthal.Append(ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, "&Orthographic",
-                              "Shows an orthographic azimuthal projection")
-        wx.EVT_MENU(self, ID_PROJ_AZIMUTHAL_ORTHOGRAPHIC, self.SetAzimuthalOrtographicProjection)
-
-        ID_PROJ_AZIMUTHAL_EQUIDISTANT = wx.NewId()
-        menu_azimuthal.Append(ID_PROJ_AZIMUTHAL_EQUIDISTANT, "&Equidistant",
-                              "Shows an orthographic equidstant projection")
-        wx.EVT_MENU(self, ID_PROJ_AZIMUTHAL_EQUIDISTANT, self.SetAzimuthalEquidistantProjection)
-
-        ID_PROJ_STEREOGRAPHIC = wx.NewId()
-        menu_azimuthal.Append(ID_PROJ_STEREOGRAPHIC, "&Stereographic", "Shows a stereographic projection")
-        wx.EVT_MENU(self, ID_PROJ_STEREOGRAPHIC, self.SetStereographicProjection)
-
-        ID_PROJ_AITOFF = wx.NewId()
-        menu_azimuthal.Append(ID_PROJ_AITOFF, "&Aitoff Projection", "Shows a Aiteoff projection")
-        wx.EVT_MENU(self, ID_PROJ_AITOFF, self.SetAitoffProjection)
-
-        ID_PROJ_WIECHEL = wx.NewId()
-        menu_azimuthal.Append(ID_PROJ_WIECHEL, "&Weichel Projection", "Shows a Weichel projection")
-        wx.EVT_MENU(self, ID_PROJ_WIECHEL, self.SetWeichelProjection)
+        self.add_projection(menu_azimuthal, "&Orthographic", "Shows an orthographic azimuthal projection",
+                            self.SetAzimuthalOrtographicProjection)
+        self.add_projection(menu_azimuthal, "&Equidistant", "Shows an orthographic equidstant projection",
+                            self.SetAzimuthalEquidistantProjection)
+        self.add_projection(menu_azimuthal, "&Stereographic", "Shows a stereographic projection",
+                            self.SetStereographicProjection)
+        self.add_projection(menu_azimuthal, "&Aitoff Projection", "Shows a Aiteoff projection",
+                            self.SetAitoffProjection)
+        self.add_projection(menu_azimuthal, "&Weichel Projection", "Shows a Weichel projection",
+                            self.SetWeichelProjection)
 
         menu_bar.Append(menu_proj, "&Projections")
 
+
+        ## center menu
         menu_views = wx.Menu()
-
-        self.ID_EUROPE = wx.NewId()
-        menu_views.Append(self.ID_EUROPE, "Center map on &Europe", "Centers the map on Europe")
-        wx.EVT_MENU(self, self.ID_EUROPE, self.Center)
-
-        self.ID_NORTH_AMERICA = wx.NewId()
-        menu_views.Append(self.ID_NORTH_AMERICA, "Center map on &North America", "Centers the map on North America")
-        wx.EVT_MENU(self, self.ID_NORTH_AMERICA, self.Center)
-
-        self.ID_SOUTH_AMERICA = wx.NewId()
-        menu_views.Append(self.ID_SOUTH_AMERICA, "Center map on &South America", "Centers the map on South America")
-        wx.EVT_MENU(self, self.ID_SOUTH_AMERICA, self.Center)
-
-        self.ID_ASIA = wx.NewId()
-        menu_views.Append(self.ID_ASIA, "Center map on &Asia", "Centers the map on Asia")
-        wx.EVT_MENU(self, self.ID_ASIA, self.Center)
-
-        self.ID_AFRICA = wx.NewId()
-        menu_views.Append(self.ID_AFRICA, "Center map on A&frica", "Centers the map on Africa")
-        wx.EVT_MENU(self, self.ID_AFRICA, self.Center)
-
-        self.ID_OCEANIA = wx.NewId()
-        menu_views.Append(self.ID_OCEANIA, "Center map on &Oceania", "Centers the map on Oceania")
-        wx.EVT_MENU(self, self.ID_OCEANIA, self.Center)
-
-        self.ID_ANTARCTICA = wx.NewId()
-        menu_views.Append(self.ID_ANTARCTICA, "Center map on An&tarctica", "Centers the map on Antarctica")
-        wx.EVT_MENU(self, self.ID_ANTARCTICA, self.Center)
+        for zone_id in ZONES:
+            self.add_center(menu_views, zone_id, ZONES[zone_id])
         menu_bar.Append(menu_views, "&Center")
 
+
+        ## shapes menu
         menu_shapes = wx.Menu()
         for shape in self.read_shapes():
             shapeId = wx.NewId()
@@ -200,12 +153,16 @@ class CartographerFrame(wx.Frame):
         self.setShape(shapeId)
         menu_bar.Append(menu_shapes, "&Shapes")
 
+
+        ## tools menu
         menu_tools = wx.Menu()
         ID_OPTIONS = wx.NewId()
         menu_tools.Append(ID_OPTIONS, "&Option", "Shows the options window")
         wx.EVT_MENU(self, ID_OPTIONS, self.OnOptions)
         menu_bar.Append(menu_tools, "&Tools")
 
+
+        ## about menu
         menu_about = wx.Menu()
         ID_INFO = wx.NewId()
         menu_about.Append(ID_INFO, "&Info", "Shows info")
@@ -215,13 +172,35 @@ class CartographerFrame(wx.Frame):
         self.SetMenuBar(menu_bar)
         self.SetStatusText("Ready")
 
+    def add_projection(self, menu, name, description, function):
+        ID = wx.NewId()
+        menu.Append(ID, name, description)
+        wx.EVT_MENU(self, ID, function)
+
+    def add_center(self, menu, ID, zone):
+        name = zone[0]
+        print("ID=" + str(ID) + " name=" + str(name))
+        menu.Append(ID, "Center map on " + name, "Centers the map on " + name)
+        wx.EVT_MENU(self, ID, self.Center)
+
+
+    def Center(self, event):
+        self.set_center(ZONES[event.GetId()][1])
+
+    def set_center(self, coords):
+        (x, y, z) = coords
+        self.rotationx = x
+        self.rotationy = y
+        self.rotationz = z
+        self.refresh()
+
     def OnOptions(self, event):
         self.options = options_window.Options(None, self)
         self.options.Show(True)
 
     def OnQuit(self, event):
-        # if self.options != None:
-        #	self.options.Destroy()
+        if self.options is not None:
+            self.options.Destroy()
         self.Destroy()
 
     def OnKeyDown(self, event):
@@ -354,29 +333,6 @@ class CartographerFrame(wx.Frame):
         old_conf.Destroy()
 
         self.SetTitle("Cartographer - " + name)
-        self.refresh()
-
-    def Center(self, event):
-        if event.GetId() == self.ID_EUROPE:
-            self.set_center(20, -5, 35)
-        elif event.GetId() == self.ID_NORTH_AMERICA:
-            self.set_center(-90, -45, 0)
-        elif event.GetId() == self.ID_SOUTH_AMERICA:
-            self.set_center(243, 170, 147)
-        elif event.GetId() == self.ID_ASIA:
-            self.set_center(85, 41, 0)
-        elif event.GetId() == self.ID_AFRICA:
-            self.set_center(20, 0, 0)
-        elif event.GetId() == self.ID_OCEANIA:
-            self.set_center(152, 0, 330)
-        elif event.GetId() == self.ID_ANTARCTICA:
-            self.set_center(120, 0, 280)
-
-    def set_center(self, x, y, z):
-
-        self.rotationx = x
-        self.rotationy = y
-        self.rotationz = z
         self.refresh()
 
     def OnExport(self, event):
