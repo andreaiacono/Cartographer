@@ -2,7 +2,7 @@ import math
 
 import mpmath
 
-from projections.proj_generic import GenericProjection
+from projections.generic import GenericProjection
 
 
 class LambertProjection(GenericProjection):

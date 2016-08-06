@@ -1,6 +1,6 @@
 import math
 
-from projections.proj_generic import GenericProjection
+from projections.generic import GenericProjection
 
 
 class MollweideProjection(GenericProjection):

@@ -19,20 +19,17 @@ class ProjectionPanel(wx.Panel):
         self.rotationy = 0.0
         self.rotationz = 0.0
         self.projection = None
-        # self.proj_width = 2000
-        # self.proj_height = 2000
         self.width = 0
         self.height = 0
         self.mf = 1
 
         self.resolution_scale = 40
-        self.set_resolution(self.resolution_scale / 10)
-        # self.set_grid_resolution(2)
+        self.resolution = self.resolution_scale / 20
 
-        self.set_paint_grid(True)
-        self.set_paint_grid_specials(False)
-        self.set_paint_frame(False)
-        self.set_draw_tissot(False)
+        self.paint_grid = True
+        self.paint_grid_specials = False
+        self.paint_frame = False
+        self.draw_tissot = False
 
         self.zoom = 360
 
@@ -73,11 +70,11 @@ class ProjectionPanel(wx.Panel):
 
             if evt.RightIsDown():
                 self.z = self.y
-                self.posz += self.z - self.lastz
+                self.posz += (self.z - self.lastz) / 3
                 self.lastz = self.z
             else:
-                self.posx -= self.x - self.lastx
-                self.posy += self.y - self.lasty
+                self.posx -= (self.x - self.lastx) / 3
+                self.posy += (self.y - self.lasty) / 3
                 self.lastx = self.x
                 self.lasty = self.y
 
@@ -115,9 +112,6 @@ class ProjectionPanel(wx.Panel):
     def set_resolution(self, resolution):
         self.resolution = resolution
 
-    def set_grid_resolution(self, grid_resolution):
-        self.grid_resolution = grid_resolution
-
     def refresh_window(self):
         dc = wx.PaintDC(self)
         self.width, self.height = self.GetSizeTuple()
@@ -148,11 +142,10 @@ class ProjectionPanel(wx.Panel):
             # self.proj_width = self.width - 10
             # self.proj_height = self.height - self.mf * visible_height - 10
 
-    def draw_parallel(self, latitude, width, height, transform_coords, dc):
+    def draw_parallel(self, latitude, transform_coords, dc):
 
         # computes the first point
-        lat, lon = self.transform_coords(latitude, -180) if transform_coords else (
-        math.radians(latitude), math.radians(-180))
+        lat, lon = self.transform_coords(latitude, -180) if transform_coords else (math.radians(latitude), math.radians(-180))
         last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
         last_x += self.tx
         last_y += self.ty
@@ -161,8 +154,7 @@ class ProjectionPanel(wx.Panel):
 
         for point in range(-89, 89):
             # if point % self.grid_resolution == 0:
-            lat, lon = self.transform_coords(latitude, point * 2) if transform_coords else (
-            math.radians(latitude), math.radians(point * 2))
+            lat, lon = self.transform_coords(latitude, point * 2) if transform_coords else (math.radians(latitude), math.radians(point * 2))
             x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
             x += self.tx
             y += self.ty
@@ -175,7 +167,7 @@ class ProjectionPanel(wx.Panel):
         # draws the last line
         dc.DrawLine(x, y, first_x, first_y)
 
-    def draw_meridian(self, longitude, width, height, transform_coords, dc):
+    def draw_meridian(self, longitude, transform_coords, dc):
 
         # computes the first point
         lat, lon = self.transform_coords(-180, longitude) if transform_coords else (math.radians(-180), math.radians(longitude))
@@ -184,10 +176,7 @@ class ProjectionPanel(wx.Panel):
         last_y += self.ty
         first_x = last_x
         first_y = last_y
-        # self.grid_resolution = 2
 
-        # pts = []
-        # wr_pts = []
         for point in range(-89, 89):
             # if point % self.grid_resolution == 0:
             #     pts.append(point)
@@ -226,24 +215,24 @@ class ProjectionPanel(wx.Panel):
             dc.SetPen(wx.Pen("light gray", 1))
             meridian_number = 360 / self.meridian_degrees
             for meridian in range(1, int(meridian_number)):
-                self.draw_meridian(meridian * self.meridian_degrees, width, height, True, dc)
+                self.draw_meridian(meridian * self.meridian_degrees, True, dc)
 
             parallel_number = 360 / self.parallel_degrees
             for parallel in range(1, int(parallel_number)):
-                self.draw_parallel(180 - parallel * self.parallel_degrees, width, height, True, dc)
+                self.draw_parallel(180 - parallel * self.parallel_degrees, True, dc)
 
         # draws special parallels (equator, tropics and arctic/antarctic circles)
         if self.paint_grid_specials:
             dc.SetPen(wx.Pen("light green", 1))
             for tropics in (-23.5, 23.5):
-                self.draw_parallel(tropics, width, height, True, dc)
+                self.draw_parallel(tropics, True, dc)
 
             dc.SetPen(wx.Pen("light blue", 1))
             for circles in (-66.5, 66.5):
-                self.draw_parallel(circles, width, height, True, dc)
+                self.draw_parallel(circles, True, dc)
 
             dc.SetPen(wx.Pen("dark red", 1))
-            self.draw_parallel(0, width, height, True, dc)
+            self.draw_parallel(0, True, dc)
 
         # draws the shapes of lands
         dc.SetPen(wx.Pen("dark blue", 1))
@@ -314,53 +303,34 @@ class ProjectionPanel(wx.Panel):
             dc.DrawLine(x, y, first_x, first_y)
             if fill:
                 pass
-                # print "fiulling " + str(center_x) + "  "  + str(center_y)
                 dc.FloodFill(transformed_center_x, transformed_center_y, (255, 162, 162), wx.FLOOD_BORDER)
-        if fill == False:
+        if not fill:
             pass
 
     # draws a frame of the map
     def draw_frame(self, width, height, dc):
-
-        self.projection.draw_frame(width, height, self, dc)
+        self.projection.draw_frame(self, dc)
 
     def transform_coords(self, lat, lon):
-
         x, y, z = self.latlong_to_cartesian(lat, lon)
-        #		x = self.latlon_to_cartesian_x[int(lat)][int(lon)]
-        #		y = self.latlon_to_cartesian_y[int(lat)][int(lon)]
-        #		z = self.latlon_to_cartesian_z[int(lat)][int(lon)]
-
         x, y, z = self.apply_rotation(self.rotationx, self.rotationy, self.rotationz, x, y, z)
-
         new_lat, new_lon = self.cartesian_to_latlong(x, y, z)
-
-        #		new_lat = self.cartesian_to_lat[int(x)][int(y)][int(z)]
-        #		new_lon = self.cartesian_to_lon[int(x)][int(y)][int(z)]
-
-        # print "old=(" + str(lat) + "," + str(lon) + " new=(" + str(new_lat) + "," + str(new_lon) + ")"
-
-        # return math.degrees(-self.new_lon[int(lon/10)]), math.degrees(-self.new_lat[int(lat/10)])*80
         return -new_lon, -new_lat * 90
 
     def latlong_to_cartesian(self, lat, lon):
         x = math.cos(math.radians(lat)) * math.cos(math.radians(lon))
         y = math.cos(math.radians(lat)) * math.sin(math.radians(lon))
         z = math.sin(math.radians(lat))
-
         return x, y, z
 
     def cartesian_to_latlong(self, x, y, z):
         lat = math.asin(math.radians(z))
         lon = math.atan2(math.radians(y), math.radians(x))
-
         return lat, lon
 
     def apply_rotation(self, rx, ry, rz, x, y, z):
-
         m = lib.euclid.Matrix4().new_rotate_euler(math.radians(rz), math.radians(rx), math.radians(ry))
         v = lib.euclid.Vector3(x, y, z)
-
         rv = m * v
         return rv.x, rv.y, rv.z
 
