@@ -3,7 +3,7 @@ import wxversion
 wxversion.select('3.0')
 import wx
 
-from main import projection_panel, earth_canvas, options_window
+from gui import projection_panel, earth_canvas, options_window
 
 from os import listdir
 from projections import aitoff
@@ -314,7 +314,7 @@ if not, write to the Free Software Foundation, Inc., 59 Temple Place,
 Suite 330, Boston, MA  02111-1307  USA"""
 
         author = "Andrea Iacono (andrea.iacono.nl@gmail.com)"
-        creds = author + "\n\nThe sources of this project are available at:\nhttp://www.github.com/andreaiacono/cartographer"
+        credits = author + "\n\nThe sources of this project are available at:\nhttp://www.github.com/andreaiacono/cartographer"
 
         info = wx.AboutDialogInfo()
         info.SetIcon(wx.Icon('img/mercator.jpg', wx.BITMAP_TYPE_JPEG))
@@ -324,7 +324,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
         info.SetCopyright('(C) 2012-2016 Andrea Iacono')
         info.SetWebSite('http://www.github.com/andreaiacono/cartographer')
         info.SetLicence(licence)
-        info.AddDeveloper(creds)
+        info.AddDeveloper(credits)
         info.AddDocWriter(author)
 
         wx.AboutBox(info)
