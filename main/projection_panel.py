@@ -231,11 +231,11 @@ class ProjectionPanel(wx.Panel):
             for circles in (-66.5, 66.5):
                 self.draw_parallel(circles, True, dc)
 
-            dc.SetPen(wx.Pen("dark red", 1))
+            dc.SetPen(wx.Pen((255, 150, 150), 1))
             self.draw_parallel(0, True, dc)
 
         # draws the shapes of lands
-        dc.SetPen(wx.Pen("dark blue", 1))
+        dc.SetPen(wx.Pen((50, 50, 255), 1))
         for shape in self.shapes:
             for i in range(len(shape.parts)):
                 start_index = shape.parts[i]
