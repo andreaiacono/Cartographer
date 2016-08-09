@@ -1,10 +1,12 @@
+import wx
+import math
+
 from Image import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from wx import glcanvas
 from wx.glcanvas import GLCanvas
-OpenGL.FULL_LOGGING = True
 
 
 class EarthCanvas(GLCanvas):
@@ -120,6 +122,7 @@ class EarthCanvas(GLCanvas):
         self.OnDraw()
 
     def OnDraw(self):
+        glDisable(GL_BLEND)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         glTranslatef(0.0, 0.0, self.view_distance)
@@ -140,7 +143,7 @@ class EarthCanvas(GLCanvas):
             glTranslatef(0.0, 0.0, -self.earth_radius * cyl_size / 2)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
-            glColor4f(1.0, 1.0, 1.0, 0.1)
+            glColor4f(1.0, 1.0, 1.0, 0.2)
             glBindTexture(GL_TEXTURE_2D, self.plain_texture)
             gluCylinder(self.plain_quad, self.earth_radius * 1.01, self.earth_radius * 1.01, self.earth_radius * cyl_size, 32, 64)
             glDisable(GL_BLEND)
@@ -202,6 +205,7 @@ class EarthCanvas(GLCanvas):
                 glVertex3f(x, y, z)
                 glVertex3f(x2, y2, z2)
         glEnd()
+        glDisable(GL_BLEND)
         glEnable(GL_TEXTURE_2D)
 
     def draw_projection_azimuthal_lines(self):
@@ -212,7 +216,7 @@ class EarthCanvas(GLCanvas):
         glColor3f(0.0, 0.0, 1.0)
         num = 9
         r = self.earth_radius
-        if (self.earthx == 0):
+        if self.earthx == 0:
             self.earthx = 0.0001
         phi = math.atan(math.radians(self.earthy / math.radians(self.earthx)))
         den = math.radians(self.earthz / r)
@@ -224,15 +228,16 @@ class EarthCanvas(GLCanvas):
         angle = 2 * math.pi / num
         for i in range (0, num):
             for j in range (0, num / 2):
-                x = 0#r * math.sin((theta + i) * angle) * math.cos((phi + j) * angle)
-                y = 0#r * math.sin((theta + i) * angle) * math.sin((phi + j) * angle)
-                z = 0#r * math.cos((theta + i) * angle)
+                x = 0   #r * math.sin((theta + i) * angle) * math.cos((phi + j) * angle)
+                y = 0   #r * math.sin((theta + i) * angle) * math.sin((phi + j) * angle)
+                z = 0   #r * math.cos((theta + i) * angle)
                 x2 = r * j * math.cos(phi + i * angle)
                 y2 = r * j * math.sin(phi + i * angle)
                 z2 = -self.earth_radius
                 glVertex3f(x, y, z)
                 glVertex3f(x2, y2, z2)
         glEnd()
+        glDisable(GL_BLEND)
         glEnable(GL_TEXTURE_2D)
 
     def set_earth_coordinates(self, x, y, z):
@@ -249,7 +254,6 @@ class EarthCanvas(GLCanvas):
         self.ReleaseMouse()
 
     def OnMouseWheel(self, evt):
-        print "vd=" + str(self.view_distance) + " wr=" + str(evt.GetWheelRotation())
         if evt.GetWheelRotation() < 0 and self.view_distance > -50:
             self.view_distance += self.view_distance / 10
         elif evt.GetWheelRotation() > 0 and self.view_distance < -4:
