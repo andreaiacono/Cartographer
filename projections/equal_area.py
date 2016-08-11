@@ -8,7 +8,7 @@ from projections.generic import GenericProjection
 class EqualAreaProjection(GenericProjection):
 
 	def __init__(self):
-		self.projection_type = self.ProjectionType.Cylindric
+		self.projection_type = self.ProjectionType.Cylindrical
 		self.set_standard_latitude(math.radians(44.138))
 
 

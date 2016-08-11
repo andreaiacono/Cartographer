@@ -63,7 +63,7 @@ class CartographerFrame(wx.Frame):
         self.earth_canvas = earth_canvas.EarthCanvas(self.settings_splitter, self)
         self.configuration_panel = empty_config.EmptyPanel(self.settings_splitter)
         self.settings_splitter.SplitHorizontally(self.earth_canvas, self.configuration_panel)
-        self.settings_splitter.SetSashGravity(0.5)
+        self.settings_splitter.SetSashGravity(0.7)
 
         wx.EVT_KEY_DOWN(self.configuration_panel, self.OnKeyDown)
         wx.EVT_KEY_DOWN(self.earth_canvas, self.OnKeyDown)

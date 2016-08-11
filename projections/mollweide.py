@@ -6,7 +6,7 @@ from projections.generic import GenericProjection
 class MollweideProjection(GenericProjection):
 	
 	def __init__(self):
-		self.projection_type = self.ProjectionType.PseudoCylindric
+		self.projection_type = self.ProjectionType.PseudoCylindrical
 
 	def get_coords(self, x, y):
 		

@@ -15,9 +15,9 @@ class GenericProjection():
         projection_panel.draw_parallel(-180, False, dc)
         projection_panel.draw_parallel(180, False, dc)
 
-        if self.projection_type == self.ProjectionType.Cylindric:
+        if self.projection_type == self.ProjectionType.Cylindrical:
             projection_panel.draw_meridian(-90, False, dc)
             projection_panel.draw_meridian(90, False, dc)
 
     class ProjectionType:
-        (Cylindric, PseudoCylindric, Conic, Azimuthal) = range(4)
+        (Cylindrical, PseudoCylindrical, Conic, Azimuthal) = range(4)

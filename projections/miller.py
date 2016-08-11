@@ -6,7 +6,7 @@ from projections.generic import GenericProjection
 class MillerProjection(GenericProjection):
 	
 	def __init__(self):
-		self.projection_type = self.ProjectionType.Cylindric
+		self.projection_type = self.ProjectionType.Cylindrical
 		self.pi_div_four = math.pi / float(4)
 
 	def get_coords(self, x, y):
