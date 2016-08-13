@@ -12,3 +12,8 @@ You can set the alignment and center of the projection by clicking on the projec
 
 ## Screenshot
 ![cartographer screenshot](http://andreaiacono.github.io/img/cartographer.png)
+
+brew install python
+brew link --overwrite python
+pip install mdmath
+pip install http://effbot.org/media/downloads/Imaging-1.1.7.tar.gp install http://effbot.org/media/downloads/Imaging-1.1.7.tar.gzz

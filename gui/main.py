@@ -60,7 +60,7 @@ class CartographerFrame(wx.Frame):
         top_splitter.SplitVertically(self.projection_panel, self.settings_splitter)
         top_splitter.SetSashGravity(0.72)
 
-        self.earth_canvas = earth_canvas.EarthCanvas(self.settings_splitter, self)
+        self.earth_canvas = wx.Frame(self)  #earth_canvas.EarthCanvas(self.settings_splitter, self)
         self.configuration_panel = empty_config.EmptyPanel(self.settings_splitter)
         self.settings_splitter.SplitHorizontally(self.earth_canvas, self.configuration_panel)
         self.settings_splitter.SetSashGravity(0.5)
@@ -238,7 +238,7 @@ class CartographerFrame(wx.Frame):
 
     def refresh(self):
         self.projection_panel.set_coordinates(self.rotationx, self.rotationy, self.rotationz)
-        self.earth_canvas.set_earth_coordinates(self.rotationx, self.rotationy, self.rotationz)
+        # self.earth_canvas.set_earth_coordinates(self.rotationx, self.rotationy, self.rotationz)
 
         self.projection_panel.Refresh()
         self.earth_canvas.Refresh()
