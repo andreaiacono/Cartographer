@@ -268,7 +268,7 @@ class ProjectionPanel(wx.Panel):
         latitude, longitude = self.transform_coords(0, 0)
         lat = str(round(latitude, 4))
         lon = str(round(longitude, 4))
-        self.cartographer.SetStatusText("Map is centered on " + lat + "°  -  " + lon + "°")
+        self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
 
     def draw_circle(self, center_x, center_y, radius, smoothness, dc):
 

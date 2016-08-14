@@ -1,4 +1,3 @@
-#coding=UTF-8
 import math
 import wx
 
@@ -22,7 +21,7 @@ class ConfigurationPanel(wx.Panel):
         self.projections = {'Lambert': 0.0, 'Behrmann': 30.0, 'Trystan Edwards': 37.383, 'Peters': 44.138, 'Gall': 45.0, 'Balthasart': 50.0}
         starting_projection = self.projections['Behrmann']
 
-        self.label_standard = wx.StaticText(self.panel, label="\nStandard Latitude: " + str(starting_projection) + "°")
+        self.label_standard = wx.StaticText(self.panel, label="\nStandard Latitude: " + str(starting_projection) + "")
         sizer.Add(self.label_standard, pos=(0, 0), flag=wx.TOP | wx.LEFT | wx.BOTTOM, border=5)
         self.slider_lat = wx.Slider(self.panel, minValue=0, maxValue=6000, value=(starting_projection*100), style=wx.SL_HORIZONTAL)
         sizer.Add(self.slider_lat, pos=(1, 0), span=(1, 2), flag=wx.EXPAND | wx.RIGHT, border=15)
@@ -55,7 +54,7 @@ class ConfigurationPanel(wx.Panel):
         self.update_windows(self.slider_lat.GetValue() / float(100))
         
     def update_windows(self, val):
-        self.label_standard.SetLabel("\nStandard Latitude: " + str(round(val, 3)) + "°")
+        self.label_standard.SetLabel("\nStandard Latitude: " + str(round(val, 3)) + "")
         self.cartographer.projection_panel.projection.set_standard_latitude(math.radians(val))
         self.cartographer.projection_panel.Refresh()
         self.Refresh()
