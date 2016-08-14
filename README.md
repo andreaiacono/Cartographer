@@ -36,3 +36,4 @@ The main window is formed by three panels:
   * the configuration panel, where you can set the parameters of the projection if it has any
 
 You can change the projection using the Projections menu, and you can choose the resolution of the map by choosing a different shape from the Shape menu (the 110_m shape has the lowest resolution and the 10_m has the highest).
+The shapes are the public domain shapefiles provided by [Natural Earth](http://www.naturalearthdata.com/) website.
