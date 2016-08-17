@@ -11,9 +11,10 @@ from projections import albers
 from projections import equidistant
 from projections import orthographic
 from projections import collignon
+from projections import gnomonic
 from projections import eckertIV
 from projections_configs import empty_config, equal_area_config, albers_config, \
-    lambert_config
+    lambert_config, gnomonic_config
 from projections import equal_area
 from projections import lambert
 from projections import mercator
@@ -104,6 +105,7 @@ class CartographerFrame(wx.Frame):
                              empty_config.EmptyPanel(self.settings_splitter)),
                 wx.NewId(): ("&Stereographic", stereographic.StereographicProjection(),
                              empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("&Gnomonic", gnomonic.GnomonicProjection(), gnomonic_config.ConfigurationPanel(self.settings_splitter, -1, self)),
                 wx.NewId(): ("&Aitoff", aitoff.AitoffProjection(), empty_config.EmptyPanel(self.settings_splitter)),
                 wx.NewId(): ("&Weichel", weichel.WeichelProjection(), empty_config.EmptyPanel(self.settings_splitter)),
             }

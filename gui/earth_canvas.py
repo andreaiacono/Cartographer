@@ -255,11 +255,9 @@ class EarthCanvas(GLCanvas):
 
             self.Refresh()
 
-    def set_standard_parallel1(self, value):
-        self.standard_parallel1 = value
-
-    def set_standard_parallel2(self, value):
-        self.standard_parallel2 = value
+    def set_standard_parallels(self, value1, value2):
+        self.standard_parallel1 = value1
+        self.standard_parallel2 = value2
 
     def draw_circle(self, y, radius, smoothness):
         mp = 2 * math.pi / smoothness

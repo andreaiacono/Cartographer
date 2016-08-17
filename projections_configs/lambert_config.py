@@ -46,10 +46,9 @@ class ConfigurationPanel(wx.Panel):
             if self.slider_phi2.GetValue() <= self.slider_phi1.GetValue():
                 self.slider_phi1.SetValue(self.slider_phi2.GetValue() - 1)
         
-        self.cartographer.projection_panel.projection.set_phi(self.slider_phi1.GetValue(), self.slider_phi2.GetValue())
+        self.cartographer.projection_panel.projection.set_standard_parallels(self.slider_phi1.GetValue(), self.slider_phi2.GetValue())
+        self.cartographer.earth_canvas.set_standard_parallels(self.slider_phi1.GetValue(), self.slider_phi2.GetValue())
         self.cartographer.projection_panel.Refresh()
-        self.cartographer.earth_canvas.set_standard_parallel1(self.slider_phi1.GetValue())
-        self.cartographer.earth_canvas.set_standard_parallel2(self.slider_phi2.GetValue())
         self.cartographer.earth_canvas.Refresh()
         
     def OnSize(self, event):

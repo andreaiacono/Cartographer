@@ -168,9 +168,9 @@ class ProjectionPanel(wx.Panel):
         dc.DrawLine(x, y, first_x, first_y)
 
     def draw_meridian(self, longitude, transform_coords, dc):
-
         # computes the first point
-        lat, lon = self.transform_coords(-180, longitude) if transform_coords else (math.radians(-180), math.radians(longitude))
+        lat, lon = self.transform_coords(-180, longitude) if transform_coords else (
+        math.radians(-180), math.radians(longitude))
         last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
         last_x += self.tx
         last_y += self.ty
@@ -180,14 +180,14 @@ class ProjectionPanel(wx.Panel):
         for point in range(-89, 89):
             # if point % self.grid_resolution == 0:
             #     pts.append(point)
-            lat, lon = self.transform_coords(point * 2, longitude) if transform_coords else (math.radians(point * 2), math.radians(longitude))
+            lat, lon = self.transform_coords(point * 2, longitude) if transform_coords else (
+            math.radians(point * 2), math.radians(longitude))
             x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
             x += self.tx
             y += self.ty
 
             if math.fabs(y - last_y) < self.height / 10 and math.fabs(x - last_x) < self.width / 10:
                 dc.DrawLine(x, y, last_x, last_y)
-                # wr_pts.append(point)
 
             last_x, last_y = x, y
 
@@ -235,6 +235,7 @@ class ProjectionPanel(wx.Panel):
             self.draw_parallel(0, True, dc)
 
         # draws the shapes of lands
+        self.projection.set_central_point(self.rotationx, self.rotationy)
         dc.SetPen(wx.Pen((50, 50, 255), 1))
         for shape in self.shapes:
             for i in range(len(shape.parts)):
@@ -271,7 +272,6 @@ class ProjectionPanel(wx.Panel):
         self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
 
     def draw_circle(self, center_x, center_y, radius, smoothness, dc):
-
         mp = 2 * math.pi / smoothness
         rx, ry = self.transform_coords(center_x + math.sin(mp) * radius, center_y + math.cos(mp) * radius)
         old_x, old_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
