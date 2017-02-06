@@ -3,7 +3,7 @@
 A simple python application that creates cartographics maps in real time that uses python 2.7, wxPython 3.0 and pyOpenGL 3.1.
 
 Here's a screenshot of the application:
-![cartographer screenshot](http://andreaiacono.github.io/img/cartographer.png)
+![cartographer screenshot](http://andreaiacono.github.io/img/cartographer.gif)
 
 ## Launch
 Launch it with:
