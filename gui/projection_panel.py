@@ -13,8 +13,8 @@ class ProjectionPanel(wx.Panel):
         self.cartographer = cartographer
         self.shapes = self.cartographer.getShape()
 
-        wx.EVT_PAINT(self, self.OnPaint)
-        wx.EVT_SIZE(self, self.OnSize)
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_SIZE, self.OnSize)
         self.rotationx = 0.0
         self.rotationy = 0.0
         self.rotationz = 0.0
@@ -24,7 +24,7 @@ class ProjectionPanel(wx.Panel):
         self.mf = 1
 
         self.resolution_scale = 40
-        self.resolution = self.resolution_scale / 20
+        self.resolution = self.resolution_scale / 5
 
         self.paint_grid = True
         self.paint_grid_specials = False
@@ -97,35 +97,20 @@ class ProjectionPanel(wx.Panel):
             self.compute_size()
             self.refresh_window()
 
-    def set_paint_grid_specials(self, paint_grid_specials):
-        self.paint_grid_specials = paint_grid_specials
-
-    def set_paint_grid(self, paint_grid):
-        self.paint_grid = paint_grid
-
-    def set_draw_tissot(self, draw_tissot):
-        self.draw_tissot = draw_tissot
-
-    def set_paint_frame(self, paint_frame):
-        self.paint_frame = paint_frame
-
-    def set_resolution(self, resolution):
-        self.resolution = resolution
-
-    def refresh_window(self):
-        dc = wx.PaintDC(self)
-        self.width, self.height = self.GetSizeTuple()
-        self.draw_projection(dc, self.width, self.height)
-
     def OnPaint(self, event):
+        self.dc = wx.PaintDC(self)
+        # self.dc = wx.GraphicsContext.Create(wx.PaintDC(self))
         self.refresh_window()
 
     def OnSize(self, event):
         self.compute_size()
-        self.refresh_window()
+
+    def refresh_window(self):
+        self.width, self.height = self.GetSize()
+        self.draw_projection(self.dc, self.width, self.height)
 
     def compute_size(self):
-        self.width, self.height = self.GetSizeTuple()
+        self.width, self.height = self.GetSize()
         visible_height = self.zoom
         visible_width = self.zoom
 
@@ -146,56 +131,55 @@ class ProjectionPanel(wx.Panel):
 
         # computes the first point
         lat, lon = self.transform_coords(latitude, -180) if transform_coords else (math.radians(latitude), math.radians(-180))
-        last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-        last_x += self.tx
-        last_y += self.ty
-        first_x = last_x
-        first_y = last_y
+        current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+        current_x = int(current_x + self.tx)
+        current_y = int(current_y + self.ty)
+        index = 0
+        lines_list = [[(current_x, current_y)]]
 
         for point in range(-89, 89):
             # if point % self.grid_resolution == 0:
             lat, lon = self.transform_coords(latitude, point * 2) if transform_coords else (math.radians(latitude), math.radians(point * 2))
-            x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-            x += self.tx
-            y += self.ty
+            current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+            current_x = int(current_x + self.tx)
+            current_y = int(current_y + self.ty)
 
-            if math.fabs(y - last_y) < self.height / 10 and math.fabs(x - last_x) < self.width / 10:
-                dc.DrawLine(x, y, last_x, last_y)
+            if math.fabs(lines_list[index][-1][0] - current_x) < self.width / 10 and math.fabs(lines_list[index][-1][1] - current_y) < self.height / 10:
+                lines_list[index].append((current_x, current_y))
+            else:
+                lines_list.append([(current_x, current_y)])
+                index = index + 1
 
-            last_x, last_y = x, y
+        for lines in lines_list:
+            if len(lines) > 1:
+                dc.DrawLines(lines)
 
-        # draws the last line
-        dc.DrawLine(x, y, first_x, first_y)
-
-    def draw_meridian(self, longitude, transform_coords, dc):
+    def draw_meridian(self, longitude, transform_coords, gc):
         # computes the first point
-        lat, lon = self.transform_coords(-180, longitude) if transform_coords else (
-        math.radians(-180), math.radians(longitude))
-        last_x, last_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-        last_x += self.tx
-        last_y += self.ty
-        first_x = last_x
-        first_y = last_y
+        lat, lon = self.transform_coords(-180, longitude) if transform_coords else (math.radians(-180), math.radians(longitude))
+        current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+        current_x = int(current_x + self.tx)
+        current_y = int(current_y + self.ty)
+        index = 0
+        lines_list = [[(current_x, current_y)]]
 
         for point in range(-89, 89):
-            # if point % self.grid_resolution == 0:
-            #     pts.append(point)
-            lat, lon = self.transform_coords(point * 2, longitude) if transform_coords else (
-            math.radians(point * 2), math.radians(longitude))
-            x, y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-            x += self.tx
-            y += self.ty
+            lat, lon = self.transform_coords(point * 2, longitude) if transform_coords else (math.radians(point * 2), math.radians(longitude))
+            current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
+            current_x = int(current_x + self.tx)
+            current_y = int(current_y + self.ty)
 
-            if math.fabs(y - last_y) < self.height / 10 and math.fabs(x - last_x) < self.width / 10:
-                dc.DrawLine(x, y, last_x, last_y)
+            if math.fabs(lines_list[index][-1][0] - current_x) < self.width / 10 and math.fabs(lines_list[index][-1][1] - current_y) < self.height / 10:
+                lines_list[index].append((current_x, current_y))
+            else:
+                lines_list.append([(current_x, current_y)])
+                index = index + 1
 
-            last_x, last_y = x, y
-
-        # draws the last line
-        dc.DrawLine(x, y, first_x, first_y)
+        for lines in lines_list:
+            if len(lines) > 1:
+                gc.DrawLines(lines)
 
     def draw_projection(self, dc, width, height):
-        dc.BeginDrawing
         dc.SetBrush(wx.Brush((255, 255, 255)))
         dc.DrawRectangle(-1, -1, width, height)
         dc.SetBrush(wx.Brush((255, 210, 210)))
@@ -207,8 +191,7 @@ class ProjectionPanel(wx.Panel):
             parallel_number = 360 / self.parallel_degrees
             for meridian in range(1, int(meridian_number)):
                 for parallel in range(1, int(parallel_number)):
-                    self.draw_circle(meridian * self.meridian_degrees, 180 - parallel * self.parallel_degrees,
-                                     self.zoom / 40, 25, dc)
+                    self.draw_circle(meridian * self.meridian_degrees, 180 - parallel * self.parallel_degrees, self.zoom / 40, 30, dc)
 
         # draws meridian and parallels
         if self.paint_grid:
@@ -223,14 +206,16 @@ class ProjectionPanel(wx.Panel):
 
         # draws special parallels (equator, tropics and arctic/antarctic circles)
         if self.paint_grid_specials:
-            dc.SetPen(wx.Pen("light green", 1))
+            dc.SetPen(wx.Pen((105, 255, 82), 1))
             for tropics in (-23.5, 23.5):
                 self.draw_parallel(tropics, True, dc)
 
-            dc.SetPen(wx.Pen("light blue", 1))
+            # dc.SetPen(wx.Pen("dark grey", 1))
+            dc.SetPen(wx.Pen((64, 245, 255), 1))
             for circles in (-66.5, 66.5):
                 self.draw_parallel(circles, True, dc)
 
+            dc.SetPen(wx.Pen("black", 1))
             dc.SetPen(wx.Pen((255, 150, 150), 1))
             self.draw_parallel(0, True, dc)
 
@@ -245,26 +230,33 @@ class ProjectionPanel(wx.Panel):
                 else:
                     end_index = len(shape.points) - 1
 
-                rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
-                start_x, start_y = tuple(val * self.mf for val in self.projection.get_coords(rx1, ry1))
+                if end_index - start_index > 0 or 1 == 1:
+                    rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
+                    current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
+                    current_x += self.tx
+                    current_y += self.ty
+                    index = 0
+                    lines = [[(current_x, current_y)]]
 
-                for point in range(start_index + 1, end_index):
+                    for point in range(start_index + 1, end_index):
+                        if point % self.resolution == 0:
+                            rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
+                            current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
+                            current_x += self.tx
+                            current_y += self.ty
+                            if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(lines[index][-1][1] - current_y) < height / 3:
+                                lines[index].append((current_x, current_y))
+                            else:
+                                lines.append([(current_x, current_y)])
+                                index = index + 1
 
-                    if point % self.resolution == 0:
-
-                        rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
-                        end_x, end_y = tuple(val * self.mf for val in self.projection.get_coords(rx2, ry2))
-
-                        if math.fabs(start_x - end_x) < width / 10 and math.fabs(start_y - end_y) < height / 10:
-                            dc.DrawLine(start_x + self.tx, start_y + self.ty, end_x + self.tx, end_y + self.ty)
-
-                        start_x, start_y = end_x, end_y
+                    for data in lines:
+                        if len(data) > 1:
+                            dc.DrawLines(data)
 
         # draws the frame
         if self.paint_frame:
             self.draw_frame(width, height, dc)
-
-        dc.EndDrawing
 
         latitude, longitude = self.transform_coords(0, 0)
         lat = str(round(latitude, 4))
@@ -274,38 +266,36 @@ class ProjectionPanel(wx.Panel):
     def draw_circle(self, center_x, center_y, radius, smoothness, dc):
         mp = 2 * math.pi / smoothness
         rx, ry = self.transform_coords(center_x + math.sin(mp) * radius, center_y + math.cos(mp) * radius)
-        old_x, old_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
-        old_x += self.tx
-        old_y += self.ty
-        first_x = old_x
-        first_y = old_y
-        fill = True
+        current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
+        current_x = int(current_x + self.tx)
+        current_y = int(current_y + self.ty)
 
-        rx, ry = self.transform_coords(center_x, center_y)
-        transformed_center_x, transformed_center_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
-        transformed_center_x += self.tx
-        transformed_center_y += self.ty
+        index = 0
+        lines_list = [[(current_x, current_y)]]
 
-        for i in range(2, smoothness):
+        for i in range(2, smoothness + 2):
             rx, ry = self.transform_coords(center_x + math.sin(i * mp) * radius, center_y + math.cos(i * mp) * radius)
-            x, y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
-            x += self.tx
-            y += self.ty
-            if math.fabs(x - old_x) < self.width / 10 and math.fabs(y - old_y) < self.height / 10:
-                dc.DrawLine(old_x, old_y, x, y)
-            else:
-                fill = False
-                pass
-            old_x = x
-            old_y = y
+            current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
+            current_x = int(current_x + self.tx)
+            current_y = int(current_y + self.ty)
 
-        if math.fabs(x - first_x) < self.width / 10 and math.fabs(y - first_y) < self.height / 10:
-            dc.DrawLine(x, y, first_x, first_y)
-            if fill:
-                pass
-                dc.FloodFill(transformed_center_x, transformed_center_y, (255, 162, 162), wx.FLOOD_BORDER)
-        if not fill:
-            pass
+            if math.fabs(lines_list[index][-1][0] - current_x) < self.width / 10 and math.fabs(lines_list[index][-1][1] - current_y) < self.height / 10:
+                lines_list[index].append((current_x, current_y))
+            else:
+                lines_list.append([(current_x, current_y)])
+                index = index + 1
+
+        for lines in lines_list:
+            if len(lines) > 1:
+                dc.DrawLines(lines)
+
+        # TO FIX
+        # rx, ry = self.transform_coords(center_x, center_y)
+        # transformed_center_x, transformed_center_y = tuple(
+        #     val * self.mf for val in self.projection.get_coords(rx, ry))
+        # transformed_center_x += self.tx
+        # transformed_center_y += self.ty
+        # dc.FloodFill(transformed_center_x, transformed_center_y, (255, 162, 162), wx.FLOOD_BORDER)
 
     # draws a frame of the map
     def draw_frame(self, width, height, dc):
@@ -348,3 +338,18 @@ class ProjectionPanel(wx.Panel):
 
     def set_meridian_degrees(self, value):
         self.meridian_degrees = value
+
+    def set_paint_grid_specials(self, paint_grid_specials):
+        self.paint_grid_specials = paint_grid_specials
+
+    def set_paint_grid(self, paint_grid):
+        self.paint_grid = paint_grid
+
+    def set_draw_tissot(self, draw_tissot):
+        self.draw_tissot = draw_tissot
+
+    def set_paint_frame(self, paint_frame):
+        self.paint_frame = paint_frame
+
+    def set_resolution(self, resolution):
+        self.resolution = resolution

@@ -1,7 +1,5 @@
-import wxversion
-
-wxversion.select('3.0')
 import wx
+import wx.adv
 
 from gui import projection_panel, earth_canvas, options_window
 
@@ -13,8 +11,7 @@ from projections import orthographic
 from projections import collignon
 from projections import gnomonic
 from projections import eckertIV
-from projections_configs import empty_config, equal_area_config, albers_config, \
-    lambert_config, gnomonic_config
+from projections_configs import empty_config, equal_area_config, albers_config, lambert_config, gnomonic_config
 from projections import equal_area
 from projections import lambert
 from projections import mercator
@@ -38,7 +35,7 @@ ZONES = {
     wx.NewId(): ("Oceania", (130, 0, 330)),
     wx.NewId(): ("Antarctica", (120, 0, 280))
 }
-
+2222
 class CartographerFrame(wx.Frame):
     def __init__(self):
         self.shape = ""
@@ -48,8 +45,9 @@ class CartographerFrame(wx.Frame):
         self.rotationz = 0
 
         wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer - Mercator projection", pos=wx.DefaultPosition, size=wx.Size(1000, 600))
-        wx.EVT_CLOSE(self, self.OnQuit)
-        wx.EVT_KEY_DOWN(self, self.OnKeyDown)
+
+        self.Bind(wx.EVT_CLOSE, self.OnQuit)
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
 
         self.CreateStatusBar()
 
@@ -66,9 +64,9 @@ class CartographerFrame(wx.Frame):
         self.settings_splitter.SplitHorizontally(self.earth_canvas, self.configuration_panel)
         self.settings_splitter.SetSashGravity(0.7)
 
-        wx.EVT_KEY_DOWN(self.configuration_panel, self.OnKeyDown)
-        wx.EVT_KEY_DOWN(self.earth_canvas, self.OnKeyDown)
-        wx.EVT_KEY_DOWN(self.projection_panel, self.OnKeyDown)
+        self.configuration_panel.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.earth_canvas.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.projection_panel.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(top_splitter, 1, wx.EXPAND)
@@ -77,40 +75,29 @@ class CartographerFrame(wx.Frame):
 
         self.projections = {
             "&Cylindrical": {
-                wx.NewId(): ("&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)",
-                             equal_area.EqualAreaProjection(),
-                             equal_area_config.ConfigurationPanel(self.settings_splitter, -1, self)),
+                wx.NewId(): ("&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)", equal_area.EqualAreaProjection(), equal_area_config.ConfigurationPanel(self.settings_splitter, -1, self)),
                 wx.NewId(): ("&Mercator", mercator.MercatorProjection(), empty_config.EmptyPanel(self.settings_splitter)),
                 wx.NewId(): ("&Miller", miller.MillerProjection(), empty_config.EmptyPanel(self.settings_splitter))
             },
             "&Pseudo Cylindrical": {
-                wx.NewId(): (
-                "&Sinusoidal", sinusoidal.SinusoidalProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("&Sinusoidal", sinusoidal.SinusoidalProjection(), empty_config.EmptyPanel(self.settings_splitter)),
                 wx.NewId(): ("&Eckert IV", eckertIV.EckertIVProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): (
-                "&Collignon", collignon.CollignonProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): (
-                "M&ollweide", mollweide.MollweideProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("&Collignon", collignon.CollignonProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("M&ollweide", mollweide.MollweideProjection(), empty_config.EmptyPanel(self.settings_splitter)),
             },
             "C&onic": {
-                wx.NewId(): ("&Lambert", lambert.LambertProjection(),
-                             lambert_config.ConfigurationPanel(self.settings_splitter, -1, self)),
-                wx.NewId(): ("&Albers", albers.AlbersProjection(),
-                             albers_config.ConfigurationPanel(self.settings_splitter, -1, self)),
+                wx.NewId(): ("&Lambert", lambert.LambertProjection(), lambert_config.ConfigurationPanel(self.settings_splitter, -1, self)),
+                wx.NewId(): ("&Albers", albers.AlbersProjection(), albers_config.ConfigurationPanel(self.settings_splitter, -1, self)),
             },
             "&Azimuthal": {
-                wx.NewId(): ("&Orthographic", orthographic.AzimuthalOrthographicProjection(),
-                             empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Equidistant", equidistant.AzimuthalEquidistantProjection(),
-                             empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Stereographic", stereographic.StereographicProjection(),
-                             empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("&Orthographic", orthographic.AzimuthalOrthographicProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("&Equidistant", equidistant.AzimuthalEquidistantProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.NewId(): ("&Stereographic", stereographic.StereographicProjection(), empty_config.EmptyPanel(self.settings_splitter)),
                 wx.NewId(): ("&Gnomonic", gnomonic.GnomonicProjection(), gnomonic_config.ConfigurationPanel(self.settings_splitter, -1, self)),
                 wx.NewId(): ("&Aitoff", aitoff.AitoffProjection(), empty_config.EmptyPanel(self.settings_splitter)),
                 wx.NewId(): ("&Weichel", weichel.WeichelProjection(), empty_config.EmptyPanel(self.settings_splitter)),
             }
         }
-
         self.SetMenuBar(self.create_menu_bar())
         self.SetStatusText("Ready")
 
@@ -121,13 +108,13 @@ class CartographerFrame(wx.Frame):
         ## file menu
         export_id = wx.NewId()
         file_menu.Append(export_id, "&Export projection as Image", "Export the actual projection as an image")
-        wx.EVT_MENU(self, export_id, self.OnExport)
+        self.Bind(wx.EVT_MENU, self.OnExport, id=export_id)
 
         file_menu.AppendSeparator()
 
         quit_id = wx.NewId()
         file_menu.Append(quit_id, "&Quit", "Quit Cartographer")
-        wx.EVT_MENU(self, quit_id, self.OnQuit)
+        self.Bind(wx.EVT_MENU, self.OnQuit, id=quit_id)
 
         menu_bar.Append(file_menu, "&File")
 
@@ -135,7 +122,8 @@ class CartographerFrame(wx.Frame):
         menu_projections = wx.Menu()
         for projection_type in self.projections:
             menu = wx.Menu()
-            menu_projections.AppendMenu(wx.ID_ANY, projection_type + " Projections", menu)
+            name = str(projection_type) + " Projections"
+            menu_projections.Append(wx.ID_ANY, name, menu)
             for projection_id in self.projections[projection_type]:
                 name = self.projections[projection_type][projection_id][0]
                 self.add_projection(menu, projection_id, name, "Sets the " + name + " projection", self.set_projection)
@@ -153,7 +141,7 @@ class CartographerFrame(wx.Frame):
             shape_id = wx.NewId()
             self.id_shapes[shape_id] = shape
             menu_shapes.Append(shape_id, shape)
-            wx.EVT_MENU(self, shape_id, self.OnSetShape)
+            self.Bind(wx.EVT_MENU, self.OnSetShape, id=shape_id)
 
         self.setShape(shape_id)
         menu_bar.Append(menu_shapes, "&Shapes")
@@ -162,26 +150,26 @@ class CartographerFrame(wx.Frame):
         menu_tools = wx.Menu()
         options_id = wx.NewId()
         menu_tools.Append(options_id, "&Option", "Shows the options window")
-        wx.EVT_MENU(self, options_id, self.OnOptions)
+        self.Bind(wx.EVT_MENU, self.OnOptions, id=options_id)
         menu_bar.Append(menu_tools, "&Tools")
 
         ## about menu
         menu_about = wx.Menu()
         info_id = wx.NewId()
         menu_about.Append(info_id, "&Info", "Shows info")
-        wx.EVT_MENU(self, info_id, self.OnInfo)
+        self.Bind(wx.EVT_MENU, self.OnInfo, id=info_id)
         menu_bar.Append(menu_about, "&About")
 
         return menu_bar
 
     def add_projection(self, menu, id, name, description, function):
         menu.Append(id, name, description)
-        wx.EVT_MENU(self, id, function)
+        self.Bind(wx.EVT_MENU, function, id=id)
 
     def add_center(self, menu, id, zone):
         name = zone[0]
         menu.Append(id, "Center map on " + name, "Centers the map on " + name)
-        wx.EVT_MENU(self, id, self.Center)
+        self.Bind(wx.EVT_MENU, self.Center, id=id)
 
     def Center(self, event):
         (x, y, z) = ZONES[event.GetId()][1]
@@ -271,7 +259,6 @@ class CartographerFrame(wx.Frame):
         mem = wx.MemoryDC()
         image = wx.EmptyBitmap(width, height)
         mem.SelectObject(image)
-        mem.BeginDrawing()
 
         proj_panel = projection_panel.ProjectionPanel(self, -1, self)
         proj_panel.projection = self.projection_panel.projection
@@ -290,7 +277,6 @@ class CartographerFrame(wx.Frame):
         proj_panel.draw_projection(mem, width, height)
 
         mem.Blit(0, 0, 2000, 1000, wx.PaintDC(proj_panel), 0, 0)
-        mem.EndDrawing()
 
         image.SaveFile(dlg.GetPath(), wx.BITMAP_TYPE_PNG)
         proj_panel.Destroy()
@@ -318,7 +304,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
         author = "Andrea Iacono (andrea.iacono.nl@gmail.com)"
         credits = author + "\n\nThe sources of this project are available at:\nhttp://www.github.com/andreaiacono/cartographer"
 
-        info = wx.AboutDialogInfo()
+        info = wx.adv.AboutDialogInfo()
         info.SetIcon(wx.Icon('img/mercator.jpg', wx.BITMAP_TYPE_JPEG))
         info.SetName('Cartographer')
         info.SetVersion('0.8')
@@ -329,7 +315,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
         info.AddDeveloper(credits)
         info.AddDocWriter(author)
 
-        wx.AboutBox(info)
+        wx.adv.AboutBox(info)
 
 
 class CartographerApplication(wx.App):

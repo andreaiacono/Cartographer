@@ -1,7 +1,6 @@
 import wx
-import math
 
-from Image import *
+from PIL.Image import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *

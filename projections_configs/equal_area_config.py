@@ -11,7 +11,7 @@ class ConfigurationPanel(wx.Panel):
         sty = wx.SUNKEN_BORDER
         wx.Window.__init__(self, parent, window_id, style=sty)
 
-        wx.EVT_SIZE(self, self.OnSize)
+        self.Bind(wx.EVT_SIZE, self.OnSize)
         self.panel = wx.Panel(self)
                     
         hbox = wx.BoxSizer(wx.HORIZONTAL)
@@ -60,5 +60,5 @@ class ConfigurationPanel(wx.Panel):
         self.Refresh()
         
     def OnSize(self, event):
-        self.panel.SetSize(self.GetSizeTuple())
+        self.panel.SetSize(self.GetSize())
         

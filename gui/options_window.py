@@ -3,13 +3,13 @@ import wx
 
 class Options(wx.Frame):
     def __init__(self, parent, cartographer):
-        super(Options, self).__init__(parent, title="Options", size=(500, 300))
+        super(Options, self).__init__(parent, title="Options", size=(500, 370))
         self.cartographer = cartographer
         panel = wx.Panel(self)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
 
-        fgs = wx.FlexGridSizer(8, 3)
+        fgs = wx.FlexGridSizer(3, 8, 5)
         fgs.AddGrowableCol(1, 1)
         label_res = wx.StaticText(panel, label="Projection Resolution       HiRes")
         label_res_end = wx.StaticText(panel, label=" LowRes")
