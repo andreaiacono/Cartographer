@@ -109,6 +109,7 @@ class Options(wx.Frame):
 
         self.cartographer.projection_panel.compute_size()
         self.cartographer.projection_panel.refresh_window()
+        self.cartographer.projection_panel.Refresh()
 
 
 if __name__ == '__main__':
