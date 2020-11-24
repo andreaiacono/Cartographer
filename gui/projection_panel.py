@@ -29,7 +29,7 @@ class ProjectionPanel(wx.Panel):
         self.paint_grid = True
         self.paint_grid_specials = False
         self.paint_frame = False
-        self.draw_tissot = False
+        self.draw_tissot = True
 
         self.zoom = 360
 
@@ -43,8 +43,8 @@ class ProjectionPanel(wx.Panel):
         self.lasty = 0
         self.lastz = 0
 
-        self.parallel_degrees = 30
-        self.meridian_degrees = 30
+        self.parallel_number = 1
+        self.meridian_number = 1
 
         self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
         self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
@@ -127,6 +127,101 @@ class ProjectionPanel(wx.Panel):
             # self.proj_width = self.width - 10
             # self.proj_height = self.height - self.mf * visible_height - 10
 
+    def draw_projection(self, dc, width, height):
+        dc.SetPen(wx.Pen((50, 50, 50), 2))
+        dc.DrawRectangle(2, 2, width-4, height-4)
+
+        meridian_spacing = 180 / (self.meridian_number + 1)
+        parallel_spacing = 180 / (self.parallel_number + 1)
+
+        longitudes = [0]
+        for meridian in range(1, int(self.meridian_number) + 1):
+            longitude = 180 - int(meridian_spacing * meridian)
+            longitudes.append(longitude)
+
+        latitudes = []
+        for parallel in range(1, self.parallel_number + 1):
+            latitude = 90 - int(parallel_spacing * parallel)
+            latitudes.append(latitude)
+
+        # draws the tissot indicatrix
+        if self.draw_tissot:
+            dc.SetPen(wx.Pen((255, 162, 162), 1))
+            radius = self.zoom / 60
+            for lon in longitudes:
+                for lat in latitudes:
+                    self.draw_circle(lat, lon, radius, 25, dc)
+                    self.draw_circle(lat, -lon, radius, 25, dc)
+            self.draw_circle(lat, 180, radius, 25, dc)
+
+        # draws meridian and parallels
+        if self.paint_grid:
+            dc.SetPen(wx.Pen("light gray", 1))
+            for lon in longitudes:
+                self.draw_meridian(lon, True, dc)
+
+            for lat in latitudes:
+                self.draw_parallel(lat, True, dc)
+
+        # draws special parallels (equator, tropics and arctic/antarctic circles)
+        if self.paint_grid_specials:
+            dc.SetPen(wx.Pen((105, 255, 82), 1))
+            for tropics in (-23.5, 23.5):
+                self.draw_parallel(tropics, True, dc)
+
+            # dc.SetPen(wx.Pen("dark grey", 1))
+            dc.SetPen(wx.Pen((64, 245, 255), 1))
+            for circles in (-66.5, 66.5):
+                self.draw_parallel(circles, True, dc)
+
+            # dc.SetPen(wx.Pen("black", 1))
+            # dc.SetPen(wx.Pen((255, 150, 150), 1))
+            # self.draw_parallel(0, True, dc)
+
+        # draws the shapes of lands
+        self.projection.set_central_point(self.rotationx, self.rotationy)
+        dc.SetPen(wx.Pen((50, 50, 255), 1))
+        for shape in self.shapes:
+            for i in range(len(shape.parts)):
+                start_index = shape.parts[i]
+                if i < len(shape.parts) - 1:
+                    end_index = shape.parts[i + 1] - 1
+                else:
+                    end_index = len(shape.points) - 1
+
+                if end_index - start_index > 0 or 1 == 1:
+                    rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
+                    current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
+                    current_x += self.tx
+                    current_y += self.ty
+                    index = 0
+                    lines = [[(current_x, current_y)]]
+
+                    for point in range(start_index + 1, end_index):
+                        if point % self.resolution == 0:
+                            rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
+                            current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
+                            current_x += self.tx
+                            current_y += self.ty
+                            if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(lines[index][-1][1] - current_y) < height / 3:
+                                lines[index].append((current_x, current_y))
+                            else:
+                                lines.append([(current_x, current_y)])
+                                index = index + 1
+
+                    for data in lines:
+                        if len(data) > 1:
+                            dc.DrawLines(data)
+
+        # draws the frame
+        if self.paint_frame:
+            self.draw_frame(width, height, dc)
+
+        latitude, longitude = self.transform_coords(0, 0)
+        lat = str(round(latitude, 4))
+        lon = str(round(longitude, 4))
+        self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
+
     def draw_parallel(self, latitude, transform_coords, dc):
 
         # computes the first point
@@ -179,93 +274,9 @@ class ProjectionPanel(wx.Panel):
             if len(lines) > 1:
                 gc.DrawLines(lines)
 
-    def draw_projection(self, dc, width, height):
-        dc.SetBrush(wx.Brush((255, 255, 255)))
-        dc.DrawRectangle(-1, -1, width, height)
-        dc.SetBrush(wx.Brush((255, 210, 210)))
-
-        # draws the tissot indicatrix
-        if self.draw_tissot:
-            dc.SetPen(wx.Pen((255, 162, 162), 1))
-            meridian_number = 360 / self.meridian_degrees
-            parallel_number = 360 / self.parallel_degrees
-            for meridian in range(1, int(meridian_number)):
-                for parallel in range(1, int(parallel_number)):
-                    self.draw_circle(meridian * self.meridian_degrees, 180 - parallel * self.parallel_degrees, self.zoom / 40, 30, dc)
-
-        # draws meridian and parallels
-        if self.paint_grid:
-            dc.SetPen(wx.Pen("light gray", 1))
-            meridian_number = 360 / self.meridian_degrees
-            for meridian in range(1, int(meridian_number)):
-                self.draw_meridian(meridian * self.meridian_degrees, True, dc)
-
-            parallel_number = 360 / self.parallel_degrees
-            for parallel in range(1, int(parallel_number)):
-                self.draw_parallel(180 - parallel * self.parallel_degrees, True, dc)
-
-        # draws special parallels (equator, tropics and arctic/antarctic circles)
-        if self.paint_grid_specials:
-            dc.SetPen(wx.Pen((105, 255, 82), 1))
-            for tropics in (-23.5, 23.5):
-                self.draw_parallel(tropics, True, dc)
-
-            # dc.SetPen(wx.Pen("dark grey", 1))
-            dc.SetPen(wx.Pen((64, 245, 255), 1))
-            for circles in (-66.5, 66.5):
-                self.draw_parallel(circles, True, dc)
-
-            dc.SetPen(wx.Pen("black", 1))
-            dc.SetPen(wx.Pen((255, 150, 150), 1))
-            self.draw_parallel(0, True, dc)
-
-        # draws the shapes of lands
-        self.projection.set_central_point(self.rotationx, self.rotationy)
-        dc.SetPen(wx.Pen((50, 50, 255), 1))
-        for shape in self.shapes:
-            for i in range(len(shape.parts)):
-                start_index = shape.parts[i]
-                if i < len(shape.parts) - 1:
-                    end_index = shape.parts[i + 1] - 1
-                else:
-                    end_index = len(shape.points) - 1
-
-                if end_index - start_index > 0 or 1 == 1:
-                    rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
-                    current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
-                    current_x += self.tx
-                    current_y += self.ty
-                    index = 0
-                    lines = [[(current_x, current_y)]]
-
-                    for point in range(start_index + 1, end_index):
-                        if point % self.resolution == 0:
-                            rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
-                            current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
-                            current_x += self.tx
-                            current_y += self.ty
-                            if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(lines[index][-1][1] - current_y) < height / 3:
-                                lines[index].append((current_x, current_y))
-                            else:
-                                lines.append([(current_x, current_y)])
-                                index = index + 1
-
-                    for data in lines:
-                        if len(data) > 1:
-                            dc.DrawLines(data)
-
-        # draws the frame
-        if self.paint_frame:
-            self.draw_frame(width, height, dc)
-
-        latitude, longitude = self.transform_coords(0, 0)
-        lat = str(round(latitude, 4))
-        lon = str(round(longitude, 4))
-        self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
-
     def draw_circle(self, center_x, center_y, radius, smoothness, dc):
         mp = 2 * math.pi / smoothness
-        rx, ry = self.transform_coords(center_x + math.sin(mp) * radius, center_y + math.cos(mp) * radius)
+        rx, ry = self.transform_coords(center_x  + math.sin(mp) * radius, center_y + math.cos(mp) * radius)
         current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
         current_x = int(current_x + self.tx)
         current_y = int(current_y + self.ty)
@@ -291,11 +302,10 @@ class ProjectionPanel(wx.Panel):
 
         # TO FIX
         # rx, ry = self.transform_coords(center_x, center_y)
-        # transformed_center_x, transformed_center_y = tuple(
-        #     val * self.mf for val in self.projection.get_coords(rx, ry))
+        # transformed_center_x, transformed_center_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
         # transformed_center_x += self.tx
         # transformed_center_y += self.ty
-        # dc.FloodFill(transformed_center_x, transformed_center_y, (255, 162, 162), wx.FLOOD_BORDER)
+        # dc.FloodFill(transformed_center_x, transformed_center_y, (255, 162, 162), wx.FLOOD_SURFACE)
 
     # draws a frame of the map
     def draw_frame(self, width, height, dc):
@@ -333,11 +343,11 @@ class ProjectionPanel(wx.Panel):
         self.zoom = value
         self.compute_size()
 
-    def set_parallel_degrees(self, value):
-        self.parallel_degrees = value
+    def set_parallel_number(self, value):
+        self.parallel_number = value
 
-    def set_meridian_degrees(self, value):
-        self.meridian_degrees = value
+    def set_meridian_number(self, value):
+        self.meridian_number = value
 
     def set_paint_grid_specials(self, paint_grid_specials):
         self.paint_grid_specials = paint_grid_specials
