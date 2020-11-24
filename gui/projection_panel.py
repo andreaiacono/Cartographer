@@ -29,7 +29,7 @@ class ProjectionPanel(wx.Panel):
         self.paint_grid = True
         self.paint_grid_specials = False
         self.paint_frame = False
-        self.draw_tissot = True
+        self.draw_tissot = False
 
         self.zoom = 360
 
@@ -43,8 +43,8 @@ class ProjectionPanel(wx.Panel):
         self.lasty = 0
         self.lastz = 0
 
-        self.parallel_number = 1
-        self.meridian_number = 1
+        self.parallel_number = 6
+        self.meridian_number = 9
 
         self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
         self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)

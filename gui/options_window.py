@@ -26,8 +26,8 @@ class Options(wx.Frame):
         label_parallel_number = wx.StaticText(panel, label="\nParallels to draw")
         label_meridian_number = wx.StaticText(panel, label="\n Meridians to draw")
 
-        self.slider_parallel_number = wx.Slider(panel, minValue=1, maxValue=60, value=9, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
-        self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=120, value=18, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
+        self.slider_parallel_number = wx.Slider(panel, minValue=2, maxValue=60, value=6, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
+        self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=120, value=9, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
 
         self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame')
         self.check_draw_grid = wx.CheckBox(panel, label='Draw meridians and parallels')
@@ -100,7 +100,7 @@ class Options(wx.Frame):
         self.cartographer.projection_panel.set_paint_grid(self.check_draw_grid.GetValue())
         self.cartographer.projection_panel.set_draw_tissot(self.check_draw_tissot.GetValue())
         self.cartographer.projection_panel.set_paint_grid_specials(self.check_draw_specials.GetValue())
-        self.cartographer.projection_panel.set_meridian_number(self.slider_meridian_number.GetValue())
+        self.cartographer.projection_panel.set_meridian_number(self.slider_meridian_number.GetValue()-1)
         self.cartographer.projection_panel.set_parallel_number(self.slider_parallel_number.GetValue())
 
         self.cartographer.projection_panel.compute_size()
