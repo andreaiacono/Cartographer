@@ -16,12 +16,8 @@ class Options(wx.Frame):
         # label_grid_res = wx.StaticText(panel, label="Grid Resolution                   HiRes")
         # label_grid_res_end = wx.StaticText(panel, label=" LowRes")
 
-        self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale,
-                                         style=wx.SL_HORIZONTAL)
-        # self.slider_grid_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale,
-        #                                  style=wx.SL_HORIZONTAL)
+        self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale, style=wx.SL_HORIZONTAL)
         self.slider_proj_res.SetValue(cartographer.projection_panel.resolution)
-        # self.slider_grid_res.SetValue(cartographer.projection_panel.grid_resolution)
 
         label_parallel_number = wx.StaticText(panel, label="\nParallels to draw")
         label_meridian_number = wx.StaticText(panel, label="\n Meridians to draw")

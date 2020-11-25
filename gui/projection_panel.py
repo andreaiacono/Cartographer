@@ -23,7 +23,7 @@ class ProjectionPanel(wx.Panel):
         self.height = 0
         self.mf = 1
 
-        self.resolution_scale = 40
+        self.resolution_scale = 50
         self.resolution = self.resolution_scale / 5
 
         self.paint_grid = True
@@ -44,7 +44,7 @@ class ProjectionPanel(wx.Panel):
         self.lastz = 0
 
         self.parallel_number = 6
-        self.meridian_number = 9
+        self.meridian_number = 8
 
         self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
         self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
@@ -90,12 +90,13 @@ class ProjectionPanel(wx.Panel):
         if evt.GetWheelRotation() < 0 and self.zoom < 360:
             self.zoom += self.zoom / 10
             self.compute_size()
-            self.refresh_window()
 
         elif evt.GetWheelRotation() > 0 and self.zoom > 10:
             self.zoom -= self.zoom / 10
             self.compute_size()
-            self.refresh_window()
+
+        self.refresh_window()
+        self.Refresh()
 
     def OnPaint(self, event):
         self.dc = wx.PaintDC(self)
@@ -128,9 +129,6 @@ class ProjectionPanel(wx.Panel):
             # self.proj_height = self.height - self.mf * visible_height - 10
 
     def draw_projection(self, dc, width, height):
-        dc.SetPen(wx.Pen((50, 50, 50), 2))
-        dc.DrawRectangle(2, 2, width-4, height-4)
-
         meridian_spacing = 180 / (self.meridian_number + 1)
         parallel_spacing = 180 / (self.parallel_number + 1)
 
@@ -174,13 +172,9 @@ class ProjectionPanel(wx.Panel):
             for circles in (-66.5, 66.5):
                 self.draw_parallel(circles, True, dc)
 
-            # dc.SetPen(wx.Pen("black", 1))
-            # dc.SetPen(wx.Pen((255, 150, 150), 1))
-            # self.draw_parallel(0, True, dc)
-
         # draws the shapes of lands
         self.projection.set_central_point(self.rotationx, self.rotationy)
-        dc.SetPen(wx.Pen((50, 50, 255), 1))
+        dc.SetPen(wx.Pen((110, 110, 255), 1))
         for shape in self.shapes:
             for i in range(len(shape.parts)):
                 start_index = shape.parts[i]
@@ -189,29 +183,30 @@ class ProjectionPanel(wx.Panel):
                 else:
                     end_index = len(shape.points) - 1
 
-                if end_index - start_index > 0 or 1 == 1:
-                    rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
-                    current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
-                    current_x += self.tx
-                    current_y += self.ty
-                    index = 0
-                    lines = [[(current_x, current_y)]]
+                if end_index - start_index < self.resolution:
+                    continue
+                rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
+                current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
+                current_x += self.tx
+                current_y += self.ty
+                index = 0
+                lines = [[(current_x, current_y)]]
 
-                    for point in range(start_index + 1, end_index):
-                        if point % self.resolution == 0:
-                            rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
-                            current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
-                            current_x += self.tx
-                            current_y += self.ty
-                            if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(lines[index][-1][1] - current_y) < height / 3:
-                                lines[index].append((current_x, current_y))
-                            else:
-                                lines.append([(current_x, current_y)])
-                                index = index + 1
+                for point in range(start_index + 1, end_index):
+                    if point % self.resolution == 0:
+                        rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
+                        current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
+                        current_x += self.tx
+                        current_y += self.ty
+                        if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(lines[index][-1][1] - current_y) < height / 3:
+                            lines[index].append((current_x, current_y))
+                        else:
+                            lines.append([(current_x, current_y)])
+                            index = index + 1
 
-                    for data in lines:
-                        if len(data) > 1:
-                            dc.DrawLines(data)
+                for data in lines:
+                    if len(data) > 1:
+                        dc.DrawLines(data)
 
         # draws the frame
         if self.paint_frame:
@@ -223,7 +218,6 @@ class ProjectionPanel(wx.Panel):
         self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
 
     def draw_parallel(self, latitude, transform_coords, dc):
-
         # computes the first point
         lat, lon = self.transform_coords(latitude, -180) if transform_coords else (math.radians(latitude), math.radians(-180))
         current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
