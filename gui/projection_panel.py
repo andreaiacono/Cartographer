@@ -5,9 +5,20 @@ import lib.euclid
 import lib.shapefile
 import wx
 
+from PIL.Image import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+from wx import glcanvas
+from wx.glcanvas import GLCanvas
 
 class ProjectionPanel(wx.Panel):
     def __init__(self, parent, window_id, cartographer):
+        # GLCanvas.__init__(self, parent, -1, style=wx.SUNKEN_BORDER, attribList=[wx.glcanvas.WX_GL_DOUBLEBUFFER])
+        # self.context = glcanvas.GLContext(self)
+        #
+        # self.init = False
+
         wx.Window.__init__(self, parent, window_id, style=wx.SUNKEN_BORDER)
         self.parent = parent
         self.cartographer = cartographer
@@ -98,13 +109,51 @@ class ProjectionPanel(wx.Panel):
         self.refresh_window()
         self.Refresh()
 
+    def InitGL(self):
+        glClearColor(1, 1, 1, 1)
+        self.init = True
+
     def OnPaint(self, event):
+        # self.SetCurrent(self.context)
+        # if not self.init:
+        #     self.InitGL()
+        # self.OnDraw()
+
         self.dc = wx.PaintDC(self)
         # self.dc = wx.GraphicsContext.Create(wx.PaintDC(self))
         self.refresh_window()
 
+    # def OnDraw(self, *args, **kwargs):
+    #     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    #
+    #     glLineWidth(0.8)
+    #     glColor4f(0.0, 0.0, 0.8, 0.3)
+    #
+    #     # lines = [0.0, 0.0, 0.5, 0.5]
+    #     # glEnableClientState(GL_VERTEX_ARRAY)
+    #     # glVertexPointer(4, GL_FLOAT, 0, len(lines))
+    #     # glDrawArrays(GL_LINES, 0, len(lines))
+    #     # glDisableClientState(GL_VERTEX_ARRAY)
+    #
+    #     lines = [0.0, 0.0, 0.5, 0.5, -1.0, -1.0]
+    #     glEnableClientState(GL_VERTEX_ARRAY)
+    #     glVertexPointer(4, GL_FLOAT, 0, len(lines))
+    #     glDrawArrays(GL_LINES, 0, len(lines))
+    #     glDisableClientState(GL_VERTEX_ARRAY)
+    #
+    #     self.SwapBuffers()
+
     def OnSize(self, event):
         self.compute_size()
+        # size = self.GetClientSize()
+        # if not size == (0, 0):
+        #     glViewport(0, 0, size[0], size[1])
+        #     glMatrixMode(GL_PROJECTION)
+        #     glLoadIdentity()
+        #     gluPerspective(45.0, float(size[0]) / float(size[1]), 0.1, 100.0)
+        #     glMatrixMode(GL_MODELVIEW)
+
+        # glViewport(0, 0, self.width, self.height)
 
     def refresh_window(self):
         self.width, self.height = self.GetSize()
@@ -129,6 +178,7 @@ class ProjectionPanel(wx.Panel):
             # self.proj_height = self.height - self.mf * visible_height - 10
 
     def draw_projection(self, dc, width, height):
+        dc.DrawRectangle(0, 0, width, height)
         meridian_spacing = 180 / (self.meridian_number + 1)
         parallel_spacing = 180 / (self.parallel_number + 1)
 

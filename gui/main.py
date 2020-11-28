@@ -35,7 +35,7 @@ ZONES = {
     wx.NewId(): ("Oceania", (130, 0, 330)),
     wx.NewId(): ("Antarctica", (120, 0, 280))
 }
-2222
+
 class CartographerFrame(wx.Frame):
     def __init__(self):
         self.shape = ""
@@ -250,14 +250,10 @@ class CartographerFrame(wx.Frame):
         self.refresh()
 
     def OnExport(self, event):
-        dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir="", defaultFile="",
-                            wildcard="*.png", style=wx.SAVE)
-        if dlg.ShowModal() != wx.ID_OK:
-            return
         height = 2000
         width = 4000
         mem = wx.MemoryDC()
-        image = wx.EmptyBitmap(width, height)
+        image = wx.Bitmap(width, height)
         mem.SelectObject(image)
 
         proj_panel = projection_panel.ProjectionPanel(self, -1, self)
@@ -276,9 +272,15 @@ class CartographerFrame(wx.Frame):
         proj_panel.ty = proj_panel.mf * 90
         proj_panel.draw_projection(mem, width, height)
 
-        mem.Blit(0, 0, 2000, 1000, wx.PaintDC(proj_panel), 0, 0)
+        dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir="", defaultFile="", wildcard="*.png", style=wx.FD_SAVE)
+        if dlg.ShowModal() != wx.ID_OK:
+            return
 
-        image.SaveFile(dlg.GetPath(), wx.BITMAP_TYPE_PNG)
+        filename = dlg.GetPath()
+        if not filename[-4] == ".png":
+            filename = filename + ".png"
+
+        image.SaveFile(filename, wx.BITMAP_TYPE_PNG)
         proj_panel.Destroy()
 
     def read_shapes(self):
@@ -309,7 +311,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
         info.SetName('Cartographer')
         info.SetVersion('0.8')
         info.SetDescription("Cartographer is a simple cartography application for making earth maps in real-time")
-        info.SetCopyright('(C) 2012-2016 Andrea Iacono')
+        info.SetCopyright('(C) 2012-2020 Andrea Iacono')
         info.SetWebSite('http://www.github.com/andreaiacono/cartographer')
         info.SetLicence(licence)
         info.AddDeveloper(credits)
