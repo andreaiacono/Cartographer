@@ -95,7 +95,7 @@ class ProjectionPanel(wx.Panel):
             self.zoom -= self.zoom / 10
             self.compute_size()
 
-        self.refresh_window()
+        self.OnDraw()
         self.Refresh()
 
     def OnSize(self, event):
@@ -103,11 +103,7 @@ class ProjectionPanel(wx.Panel):
 
     def OnPaint(self, event):
         self.dc = wx.PaintDC(self)
-        self.refresh_window()
-
-    def refresh_window(self):
-        self.width, self.height = self.GetSize()
-        self.OnDraw(self.dc, self.width, self.height)
+        self.OnDraw()
 
     def compute_size(self):
         self.width, self.height = self.GetSize()
@@ -127,8 +123,9 @@ class ProjectionPanel(wx.Panel):
             # self.proj_width = self.width - 10
             # self.proj_height = self.height - self.mf * visible_height - 10
 
-    def OnDraw(self, dc, width, height):
-        dc.DrawRectangle(0, 0, width, height)
+    def OnDraw(self):
+        dc = self.dc
+        dc.DrawRectangle(0, 0, self.width, self.height)
         meridian_spacing = 180 / (self.meridian_number + 1)
         parallel_spacing = 180 / (self.parallel_number + 1)
 
@@ -179,7 +176,7 @@ class ProjectionPanel(wx.Panel):
 
         # draws the frame
         if self.paint_frame:
-            self.draw_frame(width, height, dc)
+            self.draw_frame(self.width, self.height, dc)
 
         latitude, longitude = self.transform_coords(0, 0)
         lat = str(round(latitude, 4))

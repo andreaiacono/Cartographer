@@ -100,7 +100,7 @@ class Options(wx.Frame):
         self.cartographer.projection_panel.set_parallel_number(self.slider_parallel_number.GetValue())
 
         self.cartographer.projection_panel.compute_size()
-        self.cartographer.projection_panel.refresh_window()
+        self.cartographer.projection_panel.OnDraw()
         self.cartographer.projection_panel.Refresh()
 
 
