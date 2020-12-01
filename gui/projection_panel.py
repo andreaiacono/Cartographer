@@ -1,25 +1,14 @@
-# coding=UTF-8
 import math
-
 import lib.euclid
 import lib.shapefile
 import wx
 
-from PIL.Image import *
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-from wx import glcanvas
-from wx.glcanvas import GLCanvas
 
 class ProjectionPanel(wx.Panel):
-    def __init__(self, parent, window_id, cartographer):
-        # GLCanvas.__init__(self, parent, -1, style=wx.SUNKEN_BORDER, attribList=[wx.glcanvas.WX_GL_DOUBLEBUFFER])
-        # self.context = glcanvas.GLContext(self)
-        #
-        # self.init = False
 
+    def __init__(self, parent, window_id, cartographer):
         wx.Window.__init__(self, parent, window_id, style=wx.SUNKEN_BORDER)
+
         self.parent = parent
         self.cartographer = cartographer
         self.shapes = self.cartographer.getShape()
@@ -109,55 +98,16 @@ class ProjectionPanel(wx.Panel):
         self.refresh_window()
         self.Refresh()
 
-    def InitGL(self):
-        glClearColor(1, 1, 1, 1)
-        self.init = True
-
-    def OnPaint(self, event):
-        # self.SetCurrent(self.context)
-        # if not self.init:
-        #     self.InitGL()
-        # self.OnDraw()
-
-        self.dc = wx.PaintDC(self)
-        # self.dc = wx.GraphicsContext.Create(wx.PaintDC(self))
-        self.refresh_window()
-
-    # def OnDraw(self, *args, **kwargs):
-    #     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-    #
-    #     glLineWidth(0.8)
-    #     glColor4f(0.0, 0.0, 0.8, 0.3)
-    #
-    #     # lines = [0.0, 0.0, 0.5, 0.5]
-    #     # glEnableClientState(GL_VERTEX_ARRAY)
-    #     # glVertexPointer(4, GL_FLOAT, 0, len(lines))
-    #     # glDrawArrays(GL_LINES, 0, len(lines))
-    #     # glDisableClientState(GL_VERTEX_ARRAY)
-    #
-    #     lines = [0.0, 0.0, 0.5, 0.5, -1.0, -1.0]
-    #     glEnableClientState(GL_VERTEX_ARRAY)
-    #     glVertexPointer(4, GL_FLOAT, 0, len(lines))
-    #     glDrawArrays(GL_LINES, 0, len(lines))
-    #     glDisableClientState(GL_VERTEX_ARRAY)
-    #
-    #     self.SwapBuffers()
-
     def OnSize(self, event):
         self.compute_size()
-        # size = self.GetClientSize()
-        # if not size == (0, 0):
-        #     glViewport(0, 0, size[0], size[1])
-        #     glMatrixMode(GL_PROJECTION)
-        #     glLoadIdentity()
-        #     gluPerspective(45.0, float(size[0]) / float(size[1]), 0.1, 100.0)
-        #     glMatrixMode(GL_MODELVIEW)
 
-        # glViewport(0, 0, self.width, self.height)
+    def OnPaint(self, event):
+        self.dc = wx.PaintDC(self)
+        self.refresh_window()
 
     def refresh_window(self):
         self.width, self.height = self.GetSize()
-        self.draw_projection(self.dc, self.width, self.height)
+        self.OnDraw(self.dc, self.width, self.height)
 
     def compute_size(self):
         self.width, self.height = self.GetSize()
@@ -177,7 +127,7 @@ class ProjectionPanel(wx.Panel):
             # self.proj_width = self.width - 10
             # self.proj_height = self.height - self.mf * visible_height - 10
 
-    def draw_projection(self, dc, width, height):
+    def OnDraw(self, dc, width, height):
         dc.DrawRectangle(0, 0, width, height)
         meridian_spacing = 180 / (self.meridian_number + 1)
         parallel_spacing = 180 / (self.parallel_number + 1)
@@ -217,12 +167,26 @@ class ProjectionPanel(wx.Panel):
             for tropics in (-23.5, 23.5):
                 self.draw_parallel(tropics, True, dc)
 
-            # dc.SetPen(wx.Pen("dark grey", 1))
             dc.SetPen(wx.Pen((64, 245, 255), 1))
             for circles in (-66.5, 66.5):
                 self.draw_parallel(circles, True, dc)
 
+            dc.SetPen(wx.Pen((255, 150, 150), 1))
+            self.draw_parallel(0, True, dc)
+
         # draws the shapes of lands
+        self.draw_projection(dc, self.width, self.height)
+
+        # draws the frame
+        if self.paint_frame:
+            self.draw_frame(width, height, dc)
+
+        latitude, longitude = self.transform_coords(0, 0)
+        lat = str(round(latitude, 4))
+        lon = str(round(longitude, 4))
+        self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
+
+    def draw_projection(self, dc, width, height):
         self.projection.set_central_point(self.rotationx, self.rotationy)
         dc.SetPen(wx.Pen((110, 110, 255), 1))
         for shape in self.shapes:
@@ -248,7 +212,8 @@ class ProjectionPanel(wx.Panel):
                         current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
                         current_x += self.tx
                         current_y += self.ty
-                        if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(lines[index][-1][1] - current_y) < height / 3:
+                        if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(
+                                lines[index][-1][1] - current_y) < height / 3:
                             lines[index].append((current_x, current_y))
                         else:
                             lines.append([(current_x, current_y)])
@@ -257,15 +222,6 @@ class ProjectionPanel(wx.Panel):
                 for data in lines:
                     if len(data) > 1:
                         dc.DrawLines(data)
-
-        # draws the frame
-        if self.paint_frame:
-            self.draw_frame(width, height, dc)
-
-        latitude, longitude = self.transform_coords(0, 0)
-        lat = str(round(latitude, 4))
-        lon = str(round(longitude, 4))
-        self.cartographer.SetStatusText("Map is centered on " + lat + "  -  " + lon + "")
 
     def draw_parallel(self, latitude, transform_coords, dc):
         # computes the first point
@@ -293,7 +249,7 @@ class ProjectionPanel(wx.Panel):
             if len(lines) > 1:
                 dc.DrawLines(lines)
 
-    def draw_meridian(self, longitude, transform_coords, gc):
+    def draw_meridian(self, longitude, transform_coords, dc):
         # computes the first point
         lat, lon = self.transform_coords(-180, longitude) if transform_coords else (math.radians(-180), math.radians(longitude))
         current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
@@ -316,7 +272,7 @@ class ProjectionPanel(wx.Panel):
 
         for lines in lines_list:
             if len(lines) > 1:
-                gc.DrawLines(lines)
+                dc.DrawLines(lines)
 
     def draw_circle(self, center_x, center_y, radius, smoothness, dc):
         mp = 2 * math.pi / smoothness

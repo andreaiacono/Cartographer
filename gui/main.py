@@ -270,7 +270,7 @@ class CartographerFrame(wx.Frame):
         proj_panel.mf = height / float(180)
         proj_panel.tx = proj_panel.mf * 180 + (width - proj_panel.mf * 360) / 2
         proj_panel.ty = proj_panel.mf * 90
-        proj_panel.draw_projection(mem, width, height)
+        proj_panel.OnDraw(mem, width, height)
 
         dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir="", defaultFile="", wildcard="*.png", style=wx.FD_SAVE)
         if dlg.ShowModal() != wx.ID_OK:
