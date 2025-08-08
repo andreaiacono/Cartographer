@@ -23,13 +23,13 @@ class ConfigurationPanel(wx.Panel):
 
         self.label_standard = wx.StaticText(self.panel, label="\nStandard Latitude: " + str(starting_projection) + "")
         sizer.Add(self.label_standard, pos=(0, 0), flag=wx.TOP | wx.LEFT | wx.BOTTOM, border=5)
-        self.slider_lat = wx.Slider(self.panel, minValue=0, maxValue=6000, value=(starting_projection*100), style=wx.SL_HORIZONTAL)
+        self.slider_lat = wx.Slider(self.panel, minValue=0, maxValue=6000, value=int(starting_projection*100), style=wx.SL_HORIZONTAL)
         sizer.Add(self.slider_lat, pos=(1, 0), span=(1, 2), flag=wx.EXPAND | wx.RIGHT, border=15)
 
         style = wx.RB_GROUP
         for idx, item in enumerate(self.projections):
             rb = wx.RadioButton(self.panel, wx.NewId(), item, style=style)
-            sizer.Add(rb, pos=(idx/2+2, idx % 2), flag=wx.ALIGN_LEFT)
+            sizer.Add(rb, pos=(idx//2+2, idx % 2), flag=wx.ALIGN_LEFT)
             rb.SetValue(self.projections[item] == starting_projection)
             self.radiobuttons.append(rb)
             style = 0

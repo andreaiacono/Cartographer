@@ -207,7 +207,7 @@ class EarthCanvas(GLCanvas):
         theta = math.acos(den)
         angle = 2 * math.pi / num
         for i in range (0, num):
-            for j in range (0, num / 2):
+            for j in range (0, num // 2):
                 x = 0   # r * math.sin((theta + i) * angle) * math.cos((phi + j) * angle)
                 y = 0   # r * math.sin((theta + i) * angle) * math.sin((phi + j) * angle)
                 z = 0   # r * math.cos((theta + i) * angle)

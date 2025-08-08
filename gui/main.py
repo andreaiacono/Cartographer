@@ -1,7 +1,7 @@
 import wx
 import wx.adv
 
-from gui import projection_panel, earth_canvas, options_window
+from gui import projection_panel, projection_panel_opengl, earth_canvas, options_window
 
 from os import listdir
 from projections import aitoff
@@ -54,6 +54,7 @@ class CartographerFrame(wx.Frame):
         top_splitter = wx.SplitterWindow(self, style=wx.SP_BORDER)
         self.settings_splitter = wx.SplitterWindow(top_splitter)
 
+        # self.projection_panel = projection_panel_opengl.ProjectionPanelGL(top_splitter, -1, self)
         self.projection_panel = projection_panel.ProjectionPanel(top_splitter, -1, self)
         self.projection_panel.projection = mercator.MercatorProjection()
         top_splitter.SplitVertically(self.projection_panel, self.settings_splitter)

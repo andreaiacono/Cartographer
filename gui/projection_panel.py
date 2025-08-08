@@ -24,7 +24,7 @@ class ProjectionPanel(wx.Panel):
         self.mf = 1
 
         self.resolution_scale = 50
-        self.resolution = self.resolution_scale / 5
+        self.resolution = 2
 
         self.paint_grid = True
         self.paint_grid_specials = False
@@ -198,8 +198,8 @@ class ProjectionPanel(wx.Panel):
                     continue
                 rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
                 current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
-                current_x += self.tx
-                current_y += self.ty
+                current_x += int(self.tx)
+                current_y += int(self.ty)
                 index = 0
                 lines = [[(current_x, current_y)]]
 
@@ -211,9 +211,9 @@ class ProjectionPanel(wx.Panel):
                         current_y += self.ty
                         if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(
                                 lines[index][-1][1] - current_y) < height / 3:
-                            lines[index].append((current_x, current_y))
+                            lines[index].append((int(current_x), int(current_y)))
                         else:
-                            lines.append([(current_x, current_y)])
+                            lines.append([(int(current_x), int(current_y))])
                             index = index + 1
 
                 for data in lines:
