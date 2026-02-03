@@ -1,7 +1,7 @@
 import wx
 import wx.adv
 
-from gui import projection_panel, projection_panel_opengl, earth_canvas, options_window
+from gui import projection_panel, projection_panel_opengl, earth_canvas, options_window, slider_panel
 
 from os import listdir
 from projections import aitoff
@@ -60,10 +60,18 @@ class CartographerFrame(wx.Frame):
         top_splitter.SplitVertically(self.projection_panel, self.settings_splitter)
         top_splitter.SetSashGravity(0.72)
 
-        self.earth_canvas = earth_canvas.EarthCanvas(self.settings_splitter, self)
+        self.canvas_splitter = wx.SplitterWindow(self.settings_splitter)
+        self.earth_canvas = earth_canvas.EarthCanvas(self.canvas_splitter, self)
+        self.slider_panel = slider_panel.SliderPanel(self.canvas_splitter, self)
+        self.canvas_splitter.SplitHorizontally(self.earth_canvas, self.slider_panel)
+        self.canvas_splitter.SetSashGravity(1.0)  # All extra space goes to earth canvas
+        # self.canvas_splitter.SetMinimumPaneSize(1)
+        self.canvas_splitter.SetSashPosition(-110)  # Slider panel gets 100px from bottom
+
         self.configuration_panel = empty_config.EmptyPanel(self.settings_splitter)
-        self.settings_splitter.SplitHorizontally(self.earth_canvas, self.configuration_panel)
-        self.settings_splitter.SetSashGravity(0.7)
+        # Don't split initially since Mercator has no params
+        # The splitter will be split/unsplit dynamically in replace_projection
+        self.settings_splitter.Initialize(self.canvas_splitter)
 
         self.configuration_panel.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
         self.earth_canvas.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
@@ -243,10 +251,29 @@ class CartographerFrame(wx.Frame):
 
     def replace_projection(self, name, new_projection, new_configuration):
         self.projection_panel.projection = new_projection
-        old_conf = self.settings_splitter.GetWindow2()
-        old_conf.Hide()
-        new_configuration.Show()
-        self.settings_splitter.ReplaceWindow(old_conf, new_configuration)
+
+        is_empty = isinstance(new_configuration, empty_config.EmptyPanel)
+        is_split = self.settings_splitter.IsSplit()
+
+        if is_empty:
+            # No parameters - unsplit if currently split
+            if is_split:
+                self.settings_splitter.Unsplit()
+        else:
+            # Has parameters - need to show config panel
+            if is_split:
+                # Already split, just replace the window
+                old_conf = self.settings_splitter.GetWindow2()
+                old_conf.Hide()
+                new_configuration.Show()
+                self.settings_splitter.ReplaceWindow(old_conf, new_configuration)
+            else:
+                # Not split, need to split
+                new_configuration.Show()
+                self.settings_splitter.SplitHorizontally(self.canvas_splitter, new_configuration)
+                self.settings_splitter.SetSashGravity(0.25)
+
+        self.configuration_panel = new_configuration
         self.SetTitle("Cartographer - " + name.replace('&', '') + " projection")
         self.refresh()
 
@@ -330,5 +357,5 @@ class CartographerApplication(wx.App):
         return True
 
 
-app = CartographerApplication()
+app = CartographerApplication(redirect=False)
 app.MainLoop()

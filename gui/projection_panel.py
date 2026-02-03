@@ -8,7 +8,6 @@ class ProjectionPanel(wx.Panel):
 
     def __init__(self, parent, window_id, cartographer):
         wx.Window.__init__(self, parent, window_id, style=wx.SUNKEN_BORDER)
-
         self.parent = parent
         self.cartographer = cartographer
         self.shapes = self.cartographer.getShape()
@@ -22,6 +21,8 @@ class ProjectionPanel(wx.Panel):
         self.width = 0
         self.height = 0
         self.mf = 1
+        self.tx = 0
+        self.ty = 0
 
         self.resolution_scale = 50
         self.resolution = 2
@@ -45,6 +46,17 @@ class ProjectionPanel(wx.Panel):
 
         self.parallel_number = 6
         self.meridian_number = 8
+
+        # Cached rotation matrix elements (9 values from 3x3 rotation)
+        self._rot_a = 1.0
+        self._rot_b = 0.0
+        self._rot_c = 0.0
+        self._rot_d = 0.0
+        self._rot_e = 1.0
+        self._rot_f = 0.0
+        self._rot_g = 0.0
+        self._rot_h = 0.0
+        self._rot_i = 1.0
 
         self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
         self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
@@ -114,18 +126,46 @@ class ProjectionPanel(wx.Panel):
             self.mf = self.height / float(visible_height)
             self.tx = self.mf * visible_width / 2 + (self.width - self.mf * visible_width) / 2
             self.ty = self.mf * visible_height / 2
-            # self.proj_width = self.width - self.mf * visible_width - 10
-            # self.proj_height = self.height - 10
         else:
             self.mf = self.width / float(visible_width)
             self.tx = self.mf * visible_width / 2
             self.ty = self.mf * visible_height / 2 + (self.height - self.mf * visible_height) / 2
-            # self.proj_width = self.width - 10
-            # self.proj_height = self.height - self.mf * visible_height - 10
+
+    def _cache_rotation_matrix(self):
+        """Precompute the 3x3 rotation matrix elements from current rotation angles.
+
+        Matches euclid.Matrix4.new_rotate_euler(heading=rz, attitude=rx, bank=ry).
+        Matrix layout: a,b,c / e,f,g / i,j,k maps to _rot_a.._rot_i.
+        """
+        _radians = math.radians
+        _cos = math.cos
+        _sin = math.sin
+        # new_rotate_euler is called as (rz, rx, ry) -> heading, attitude, bank
+        ch = _cos(_radians(self.rotationz))
+        sh = _sin(_radians(self.rotationz))
+        ca = _cos(_radians(self.rotationx))
+        sa = _sin(_radians(self.rotationx))
+        cb = _cos(_radians(self.rotationy))
+        sb = _sin(_radians(self.rotationy))
+        self._rot_a = ch * ca
+        self._rot_b = sh * sb - ch * sa * cb
+        self._rot_c = ch * sa * sb + sh * cb
+        self._rot_d = sa
+        self._rot_e = ca * cb
+        self._rot_f = -ca * sb
+        self._rot_g = -sh * ca
+        self._rot_h = sh * sa * cb + ch * sb
+        self._rot_i = -sh * sa * sb + ch * cb
 
     def OnDraw(self):
+        # Cache rotation matrix once per frame
+        self._cache_rotation_matrix()
+
         dc = self.dc
         dc.DrawRectangle(0, 0, self.width, self.height)
+
+        if self.projection is None:
+            return
         meridian_spacing = 180 / (self.meridian_number + 1)
         parallel_spacing = 180 / (self.parallel_number + 1)
 
@@ -186,34 +226,54 @@ class ProjectionPanel(wx.Panel):
     def draw_projection(self, dc, width, height):
         self.projection.set_central_point(self.rotationx, self.rotationy)
         dc.SetPen(wx.Pen((110, 110, 255), 1))
-        for shape in self.shapes:
-            for i in range(len(shape.parts)):
-                start_index = shape.parts[i]
-                if i < len(shape.parts) - 1:
-                    end_index = shape.parts[i + 1] - 1
-                else:
-                    end_index = len(shape.points) - 1
 
-                if end_index - start_index < self.resolution:
+        # Cache attribute lookups in local variables
+        mf = self.mf
+        tx = self.tx
+        ty = self.ty
+        resolution = self.resolution
+        projection_get_coords = self.projection.get_coords
+        transform = self.transform_coords
+        _fabs = math.fabs
+        width_third = width / 3
+        height_third = height / 3
+
+        for shape in self.shapes:
+            parts = shape.parts
+            points = shape.points
+            num_parts = len(parts)
+            num_points = len(points)
+
+            for i in range(num_parts):
+                start_index = parts[i]
+                if i < num_parts - 1:
+                    end_index = parts[i + 1] - 1
+                else:
+                    end_index = num_points - 1
+
+                if end_index - start_index < resolution:
                     continue
-                rx1, ry1 = self.transform_coords(shape.points[start_index][1], -shape.points[start_index][0])
-                current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx1, ry1))
-                current_x += int(self.tx)
-                current_y += int(self.ty)
+
+                p = points[start_index]
+                rx1, ry1 = transform(p[1], -p[0])
+                cx, cy = projection_get_coords(rx1, ry1)
+                current_x = int(cx * mf) + int(tx)
+                current_y = int(cy * mf) + int(ty)
                 index = 0
                 lines = [[(current_x, current_y)]]
 
                 for point in range(start_index + 1, end_index):
-                    if point % self.resolution == 0:
-                        rx2, ry2 = self.transform_coords(shape.points[point + 1][1], -shape.points[point + 1][0])
-                        current_x, current_y = tuple(int(val * self.mf) for val in self.projection.get_coords(rx2, ry2))
-                        current_x += self.tx
-                        current_y += self.ty
-                        if math.fabs(lines[index][-1][0] - current_x) < width / 3 and math.fabs(
-                                lines[index][-1][1] - current_y) < height / 3:
-                            lines[index].append((int(current_x), int(current_y)))
+                    if point % resolution == 0:
+                        p = points[point + 1]
+                        rx2, ry2 = transform(p[1], -p[0])
+                        cx, cy = projection_get_coords(rx2, ry2)
+                        current_x = int(cx * mf + tx)
+                        current_y = int(cy * mf + ty)
+                        if _fabs(lines[index][-1][0] - current_x) < width_third and _fabs(
+                                lines[index][-1][1] - current_y) < height_third:
+                            lines[index].append((current_x, current_y))
                         else:
-                            lines.append([(int(current_x), int(current_y))])
+                            lines.append([(current_x, current_y)])
                             index = index + 1
 
                 for data in lines:
@@ -221,22 +281,32 @@ class ProjectionPanel(wx.Panel):
                         dc.DrawLines(data)
 
     def draw_parallel(self, latitude, transform_coords, dc):
+        # Cache locals
+        mf = self.mf
+        tx = self.tx
+        ty = self.ty
+        w_limit = self.width / 10
+        h_limit = self.height / 10
+        projection_get_coords = self.projection.get_coords
+        transform = self.transform_coords
+        _fabs = math.fabs
+        _radians = math.radians
+
         # computes the first point
-        lat, lon = self.transform_coords(latitude, -180) if transform_coords else (math.radians(latitude), math.radians(-180))
-        current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-        current_x = int(current_x + self.tx)
-        current_y = int(current_y + self.ty)
+        lat, lon = transform(latitude, -180) if transform_coords else (_radians(latitude), _radians(-180))
+        cx, cy = projection_get_coords(lat, lon)
+        current_x = int(cx * mf + tx)
+        current_y = int(cy * mf + ty)
         index = 0
         lines_list = [[(current_x, current_y)]]
 
         for point in range(-89, 89):
-            # if point % self.grid_resolution == 0:
-            lat, lon = self.transform_coords(latitude, point * 2) if transform_coords else (math.radians(latitude), math.radians(point * 2))
-            current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-            current_x = int(current_x + self.tx)
-            current_y = int(current_y + self.ty)
+            lat, lon = transform(latitude, point * 2) if transform_coords else (_radians(latitude), _radians(point * 2))
+            cx, cy = projection_get_coords(lat, lon)
+            current_x = int(cx * mf + tx)
+            current_y = int(cy * mf + ty)
 
-            if math.fabs(lines_list[index][-1][0] - current_x) < self.width / 10 and math.fabs(lines_list[index][-1][1] - current_y) < self.height / 10:
+            if _fabs(lines_list[index][-1][0] - current_x) < w_limit and _fabs(lines_list[index][-1][1] - current_y) < h_limit:
                 lines_list[index].append((current_x, current_y))
             else:
                 lines_list.append([(current_x, current_y)])
@@ -247,21 +317,32 @@ class ProjectionPanel(wx.Panel):
                 dc.DrawLines(lines)
 
     def draw_meridian(self, longitude, transform_coords, dc):
+        # Cache locals
+        mf = self.mf
+        tx = self.tx
+        ty = self.ty
+        w_limit = self.width / 10
+        h_limit = self.height / 10
+        projection_get_coords = self.projection.get_coords
+        transform = self.transform_coords
+        _fabs = math.fabs
+        _radians = math.radians
+
         # computes the first point
-        lat, lon = self.transform_coords(-180, longitude) if transform_coords else (math.radians(-180), math.radians(longitude))
-        current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-        current_x = int(current_x + self.tx)
-        current_y = int(current_y + self.ty)
+        lat, lon = transform(-180, longitude) if transform_coords else (_radians(-180), _radians(longitude))
+        cx, cy = projection_get_coords(lat, lon)
+        current_x = int(cx * mf + tx)
+        current_y = int(cy * mf + ty)
         index = 0
         lines_list = [[(current_x, current_y)]]
 
         for point in range(-89, 89):
-            lat, lon = self.transform_coords(point * 2, longitude) if transform_coords else (math.radians(point * 2), math.radians(longitude))
-            current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(lat, lon))
-            current_x = int(current_x + self.tx)
-            current_y = int(current_y + self.ty)
+            lat, lon = transform(point * 2, longitude) if transform_coords else (_radians(point * 2), _radians(longitude))
+            cx, cy = projection_get_coords(lat, lon)
+            current_x = int(cx * mf + tx)
+            current_y = int(cy * mf + ty)
 
-            if math.fabs(lines_list[index][-1][0] - current_x) < self.width / 10 and math.fabs(lines_list[index][-1][1] - current_y) < self.height / 10:
+            if _fabs(lines_list[index][-1][0] - current_x) < w_limit and _fabs(lines_list[index][-1][1] - current_y) < h_limit:
                 lines_list[index].append((current_x, current_y))
             else:
                 lines_list.append([(current_x, current_y)])
@@ -272,22 +353,35 @@ class ProjectionPanel(wx.Panel):
                 dc.DrawLines(lines)
 
     def draw_circle(self, center_x, center_y, radius, smoothness, dc):
+        # Cache locals
+        mf = self.mf
+        tx = self.tx
+        ty = self.ty
+        w_limit = self.width / 10
+        h_limit = self.height / 10
+        projection_get_coords = self.projection.get_coords
+        transform = self.transform_coords
+        _fabs = math.fabs
+        _sin = math.sin
+        _cos = math.cos
+
         mp = 2 * math.pi / smoothness
-        rx, ry = self.transform_coords(center_x  + math.sin(mp) * radius, center_y + math.cos(mp) * radius)
-        current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
-        current_x = int(current_x + self.tx)
-        current_y = int(current_y + self.ty)
+        rx, ry = transform(center_x + _sin(mp) * radius, center_y + _cos(mp) * radius)
+        cx, cy = projection_get_coords(rx, ry)
+        current_x = int(cx * mf + tx)
+        current_y = int(cy * mf + ty)
 
         index = 0
         lines_list = [[(current_x, current_y)]]
 
         for i in range(2, smoothness + 2):
-            rx, ry = self.transform_coords(center_x + math.sin(i * mp) * radius, center_y + math.cos(i * mp) * radius)
-            current_x, current_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
-            current_x = int(current_x + self.tx)
-            current_y = int(current_y + self.ty)
+            angle = i * mp
+            rx, ry = transform(center_x + _sin(angle) * radius, center_y + _cos(angle) * radius)
+            cx, cy = projection_get_coords(rx, ry)
+            current_x = int(cx * mf + tx)
+            current_y = int(cy * mf + ty)
 
-            if math.fabs(lines_list[index][-1][0] - current_x) < self.width / 10 and math.fabs(lines_list[index][-1][1] - current_y) < self.height / 10:
+            if _fabs(lines_list[index][-1][0] - current_x) < w_limit and _fabs(lines_list[index][-1][1] - current_y) < h_limit:
                 lines_list[index].append((current_x, current_y))
             else:
                 lines_list.append([(current_x, current_y)])
@@ -297,21 +391,39 @@ class ProjectionPanel(wx.Panel):
             if len(lines) > 1:
                 dc.DrawLines(lines)
 
-        # TO FIX
-        # rx, ry = self.transform_coords(center_x, center_y)
-        # transformed_center_x, transformed_center_y = tuple(val * self.mf for val in self.projection.get_coords(rx, ry))
-        # transformed_center_x += self.tx
-        # transformed_center_y += self.ty
-        # dc.FloodFill(transformed_center_x, transformed_center_y, (255, 162, 162), wx.FLOOD_SURFACE)
-
     # draws a frame of the map
     def draw_frame(self, width, height, dc):
         self.projection.draw_frame(self, dc)
 
     def transform_coords(self, lat, lon):
-        x, y, z = self.latlong_to_cartesian(lat, lon)
-        x, y, z = self.apply_rotation(self.rotationx, self.rotationy, self.rotationz, x, y, z)
-        new_lat, new_lon = self.cartesian_to_latlong(x, y, z)
+        """Inlined transform: latlong->cartesian->rotation->cartesian->latlong with no intermediate objects."""
+        _radians = math.radians
+        lat_r = _radians(lat)
+        lon_r = _radians(lon)
+
+        # latlong_to_cartesian (inlined)
+        cos_lat = math.cos(lat_r)
+        x = cos_lat * math.cos(lon_r)
+        y = cos_lat * math.sin(lon_r)
+        z = math.sin(lat_r)
+
+        # apply_rotation using cached matrix (inlined)
+        ra = self._rot_a
+        rb = self._rot_b
+        rc = self._rot_c
+        rd = self._rot_d
+        re = self._rot_e
+        rf = self._rot_f
+        rg = self._rot_g
+        rh = self._rot_h
+        ri = self._rot_i
+        nx = ra * x + rb * y + rc * z
+        ny = rd * x + re * y + rf * z
+        nz = rg * x + rh * y + ri * z
+
+        # cartesian_to_latlong (inlined)
+        new_lat = math.asin(_radians(nz))
+        new_lon = math.atan2(_radians(ny), _radians(nx))
         return -new_lon, -new_lat * 90
 
     def latlong_to_cartesian(self, lat, lon):
