@@ -146,13 +146,20 @@ class CartographerFrame(wx.Frame):
 
         ## shapes menu
         menu_shapes = wx.Menu()
+        default_shape_id = None
         for shape in self.read_shapes():
             shape_id = wx.NewId()
             self.id_shapes[shape_id] = shape
             menu_shapes.Append(shape_id, shape)
             self.Bind(wx.EVT_MENU, self.OnSetShape, id=shape_id)
+            # Set ne_50m_coastline as default, fallback to last shape
+            if shape == "ne_50m_coastline":
+                default_shape_id = shape_id
+            elif default_shape_id is None:
+                default_shape_id = shape_id
 
-        self.setShape(shape_id)
+        if default_shape_id is not None:
+            self.setShape(default_shape_id)
         menu_bar.Append(menu_shapes, "&Shapes")
 
         ## tools menu

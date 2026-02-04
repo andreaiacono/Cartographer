@@ -32,18 +32,6 @@ class Options(wx.Frame):
         self.check_draw_rays = wx.CheckBox(panel, label='Draw Projection Rays')
         self.check_draw_rays.SetValue(cartographer.earth_canvas.draw_rays)
 
-        label_ray_density = wx.StaticText(panel, label="Ray Density")
-        label_ray_density_end = wx.StaticText(panel, label="")
-        self.slider_ray_density = wx.Slider(panel, minValue=5, maxValue=80, value=cartographer.earth_canvas.ray_density, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
-
-        label_ray_alpha = wx.StaticText(panel, label="Ray Transparency")
-        label_ray_alpha_end = wx.StaticText(panel, label="")
-        self.slider_ray_alpha = wx.Slider(panel, minValue=0, maxValue=100, value=cartographer.earth_canvas.ray_alpha, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
-
-        label_unwrap = wx.StaticText(panel, label="Cylinder Unwrap")
-        label_unwrap_end = wx.StaticText(panel, label="")
-        self.slider_cylinder_unwrap = wx.Slider(panel, minValue=0, maxValue=100, value=cartographer.earth_canvas.cylinder_unwrap, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
-
         self.check_draw_frame.SetValue(cartographer.projection_panel.paint_frame)
         self.check_draw_grid.SetValue(cartographer.projection_panel.paint_grid)
         self.check_draw_specials.SetValue(cartographer.projection_panel.paint_grid_specials)
@@ -92,18 +80,6 @@ class Options(wx.Frame):
         fgs.Add(wx.StaticText(panel))
         fgs.Add(wx.StaticText(panel))
 
-        fgs.Add(label_ray_density)
-        fgs.Add(self.slider_ray_density, 1, wx.EXPAND)
-        fgs.Add(label_ray_density_end)
-
-        fgs.Add(label_ray_alpha)
-        fgs.Add(self.slider_ray_alpha, 1, wx.EXPAND)
-        fgs.Add(label_ray_alpha_end)
-
-        fgs.Add(label_unwrap)
-        fgs.Add(self.slider_cylinder_unwrap, 1, wx.EXPAND)
-        fgs.Add(label_unwrap_end)
-
         # fgs.AddMany([
         #     (label_res), (self.slider_proj_res, 1, wx.EXPAND), (empty_label),
         #     (self.check_draw_frame, 1, wx.EXPAND), (empty_label), (empty_label),
@@ -130,15 +106,7 @@ class Options(wx.Frame):
         self.cartographer.projection_panel.set_parallel_number(self.slider_parallel_number.GetValue())
 
         self.cartographer.earth_canvas.draw_rays = self.check_draw_rays.GetValue()
-        self.cartographer.earth_canvas.ray_density = self.slider_ray_density.GetValue()
-        self.cartographer.earth_canvas.ray_alpha = self.slider_ray_alpha.GetValue()
-        self.cartographer.earth_canvas.cylinder_unwrap = self.slider_cylinder_unwrap.GetValue()
         self.cartographer.earth_canvas.Refresh()
-
-        # Sync with slider panel
-        self.cartographer.slider_panel.slider_ray_density.SetValue(self.slider_ray_density.GetValue())
-        self.cartographer.slider_panel.slider_ray_alpha.SetValue(self.slider_ray_alpha.GetValue())
-        self.cartographer.slider_panel.slider_cylinder_unwrap.SetValue(self.slider_cylinder_unwrap.GetValue())
 
         self.cartographer.projection_panel.compute_size()
         self.cartographer.projection_panel.OnDraw()

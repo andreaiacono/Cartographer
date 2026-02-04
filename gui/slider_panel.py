@@ -54,9 +54,3 @@ class SliderPanel(wx.Panel):
         self.cartographer.earth_canvas.ray_alpha = self.slider_ray_alpha.GetValue()
         self.cartographer.earth_canvas.cylinder_unwrap = self.slider_cylinder_unwrap.GetValue()
         self.cartographer.earth_canvas.Refresh()
-
-        # Sync with options window if open
-        if self.cartographer.options:
-            self.cartographer.options.slider_ray_density.SetValue(self.slider_ray_density.GetValue())
-            self.cartographer.options.slider_ray_alpha.SetValue(self.slider_ray_alpha.GetValue())
-            self.cartographer.options.slider_cylinder_unwrap.SetValue(self.slider_cylinder_unwrap.GetValue())

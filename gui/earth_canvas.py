@@ -581,9 +581,9 @@ class EarthCanvas(GLCanvas):
 
 
     def set_earth_coordinates(self, x, y, z):
-        self.earthx = x
-        self.earthy = y
-        self.earthz = z
+        self.earthx = -x  # left/right -> Z axis rotation (spin in place)
+        self.earthy = z   # pageup/pagedown -> X axis rotation (tilt)
+        self.earthz = y   # up/down -> Y axis rotation (spin globe)
 
     def OnMouseDown(self, evt):
         self.CaptureMouse()
