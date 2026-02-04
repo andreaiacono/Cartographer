@@ -233,10 +233,35 @@ class ProjectionPanel(wx.Panel):
         ty = self.ty
         resolution = self.resolution
         projection_get_coords = self.projection.get_coords
-        transform = self.transform_coords
-        _fabs = math.fabs
         width_third = width / 3
         height_third = height / 3
+
+        # Cache rotation matrix values locally
+        ra, rb, rc = self._rot_a, self._rot_b, self._rot_c
+        rd, re, rf = self._rot_d, self._rot_e, self._rot_f
+        rg, rh, ri = self._rot_g, self._rot_h, self._rot_i
+
+        # Cache math functions locally
+        _radians = math.radians
+        _cos = math.cos
+        _sin = math.sin
+        _asin = math.asin
+        _atan2 = math.atan2
+
+        # Inline transform function for speed
+        def fast_transform(lat, lon):
+            lat_r = _radians(lat)
+            lon_r = _radians(lon)
+            cos_lat = _cos(lat_r)
+            x = cos_lat * _cos(lon_r)
+            y = cos_lat * _sin(lon_r)
+            z = _sin(lat_r)
+            nx = ra * x + rb * y + rc * z
+            ny = rd * x + re * y + rf * z
+            nz = rg * x + rh * y + ri * z
+            new_lat = _asin(_radians(nz))
+            new_lon = _atan2(_radians(ny), _radians(nx))
+            return -new_lon, -new_lat * 90
 
         for shape in self.shapes:
             parts = shape.parts
@@ -246,35 +271,36 @@ class ProjectionPanel(wx.Panel):
 
             for i in range(num_parts):
                 start_index = parts[i]
-                if i < num_parts - 1:
-                    end_index = parts[i + 1] - 1
-                else:
-                    end_index = num_points - 1
+                end_index = parts[i + 1] - 1 if i < num_parts - 1 else num_points - 1
 
                 if end_index - start_index < resolution:
                     continue
 
                 p = points[start_index]
-                rx1, ry1 = transform(p[1], -p[0])
+                rx1, ry1 = fast_transform(p[1], -p[0])
                 cx, cy = projection_get_coords(rx1, ry1)
-                current_x = int(cx * mf) + int(tx)
-                current_y = int(cy * mf) + int(ty)
-                index = 0
-                lines = [[(current_x, current_y)]]
+                prev_x = int(cx * mf + tx)
+                prev_y = int(cy * mf + ty)
+                current_line = [(prev_x, prev_y)]
+                lines = [current_line]
 
-                for point in range(start_index + 1, end_index):
-                    if point % resolution == 0:
-                        p = points[point + 1]
-                        rx2, ry2 = transform(p[1], -p[0])
-                        cx, cy = projection_get_coords(rx2, ry2)
-                        current_x = int(cx * mf + tx)
-                        current_y = int(cy * mf + ty)
-                        if _fabs(lines[index][-1][0] - current_x) < width_third and _fabs(
-                                lines[index][-1][1] - current_y) < height_third:
-                            lines[index].append((current_x, current_y))
-                        else:
-                            lines.append([(current_x, current_y)])
-                            index = index + 1
+                for point in range(start_index + resolution, end_index, resolution):
+                    p = points[point]
+                    rx2, ry2 = fast_transform(p[1], -p[0])
+                    cx, cy = projection_get_coords(rx2, ry2)
+                    curr_x = int(cx * mf + tx)
+                    curr_y = int(cy * mf + ty)
+
+                    # Check for large jumps (edge wrapping)
+                    dx = curr_x - prev_x
+                    dy = curr_y - prev_y
+                    if dx < width_third and dx > -width_third and dy < height_third and dy > -height_third:
+                        current_line.append((curr_x, curr_y))
+                    else:
+                        current_line = [(curr_x, curr_y)]
+                        lines.append(current_line)
+
+                    prev_x, prev_y = curr_x, curr_y
 
                 for data in lines:
                     if len(data) > 1:
