@@ -7,6 +7,7 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from wx import glcanvas
 from wx.glcanvas import GLCanvas
+import lib.shapefile
 
 
 class EarthCanvas(GLCanvas):
@@ -20,8 +21,8 @@ class EarthCanvas(GLCanvas):
         self.cartographer = cartographer
         self.init = False
 
-        self.posx = 0
-        self.posy = 0
+        self.posx = -10
+        self.posy = -90
         self.posz = 0
         self.earthx = 0
         self.earthy = 0
@@ -39,7 +40,7 @@ class EarthCanvas(GLCanvas):
         self.standard_parallel1 = 15
         self.standard_parallel2 = 15
         self.draw_rays = True
-        self.ray_density = 50
+        self.points_per_50 = 30  # Default: draw 30 out of every 50 points (60%)
         self.ray_alpha = 50  # 0-100, will be converted to 0.0-1.0
         self.cylinder_unwrap = 0
         self.earth_texture = None
@@ -54,6 +55,9 @@ class EarthCanvas(GLCanvas):
         self.Bind(wx.EVT_RIGHT_UP, self.OnMouseUp)
         self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
         self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
+
+        # Load 110m_land shapes for OpenGL panel (lower detail for performance)
+        self.opengl_shapes = lib.shapefile.Reader("shapes/110m_land/110m_land.shp").shapes()
 
     def InitGL(self):
         # the earth texture
@@ -145,6 +149,8 @@ class EarthCanvas(GLCanvas):
                         self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.PseudoCylindrical:
             cyl_size = 6
             glPushMatrix()
+            # Keep cylinder fixed (vertical) - Earth rotates inside it
+            # This shows what happens when different great circles become tangent to the cylinder
             glTranslatef(0.0, 0.0, -self.earth_radius * cyl_size / 2)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
@@ -459,13 +465,82 @@ class EarthCanvas(GLCanvas):
 
         return []
 
+    def _get_mercator_cylinder_point(self, lon_deg, lat_deg):
+        """Calculate where a point at given lat/lon should appear on the cylinder using Mercator formula.
+
+        Returns (x, y, z) on the cylinder surface where:
+        - x, y define the position around the cylinder (from longitude)
+        - z is the height using Mercator formula: r * asinh(tan(lat))
+        """
+        r = self.earth_radius
+        cyl_r = r * 1.01  # Same radius as cylinder
+
+        lon = math.radians(lon_deg)
+        lat = math.radians(lat_deg)
+
+        # Position around cylinder (from longitude)
+        # Match the coordinate system: negative sin for x, negative cos for y
+        x = cyl_r * math.sin(lon)
+        y = -cyl_r * math.cos(lon)
+
+        # Height using Mercator formula: z = r * asinh(tan(lat))
+        # This naturally scales to fill the cylinder which extends from -r*3 to +r*3
+        # asinh(tan(lat)) ranges from about -3 to +3 for latitudes up to ±85°
+        if abs(lat) < math.pi/2 - 0.01:  # Avoid poles
+            z = r * math.asinh(math.tan(lat))
+        else:
+            # At poles, use a large value with appropriate sign
+            z = math.copysign(r * 2.5, lat)
+
+        return (x, y, z)
+
+    def _generate_mercator_ray(self, sphere_pt, mercator_pt, lat_deg, steps=20):
+        """Generate a ray from Earth's center through surface, curving to Mercator point.
+
+        The ray shows:
+        - Center to surface: straight radial line (hidden inside Earth)
+        - Surface to cylinder: smooth curve to Mercator-corrected position
+
+        The curvature amount visualizes Mercator distortion:
+        - Equator: nearly straight (minimal distortion)
+        - Higher latitudes: more curve (more distortion)
+        """
+        sx, sy, sz = sphere_pt
+        mx, my, mz = mercator_pt
+
+        points = [(0, 0, 0)]  # Start from Earth's center
+
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+
+            if t <= 0.5:
+                # From center to sphere surface: straight radial line (INSIDE Earth)
+                # This portion is hidden by depth buffer
+                scale = t * 2.0
+                x, y, z = scale * sx, scale * sy, scale * sz
+            else:
+                # From surface to Mercator point: smooth curve (VISIBLE)
+                t_curve = (t - 0.5) * 2.0  # 0 to 1 for curve segment
+
+                # Smooth easing using smoothstep
+                smooth = t_curve * t_curve * (3 - 2 * t_curve)
+
+                x = sx + smooth * (mx - sx)
+                y = sy + smooth * (my - sy)
+                z = sz + smooth * (mz - sz)
+
+            points.append((x, y, z))
+
+        return points
+
     def draw_shape_rays(self):
         r = self.earth_radius
         projection = self.cartographer.projection_panel.projection
         proj_type = projection.projection_type
         ProjectionType = projection.ProjectionType
 
-        shapes = self.cartographer.projection_panel.shapes
+        # Use 110m_land shapes for OpenGL panel (better performance)
+        shapes = self.opengl_shapes
 
         # Build rotation matrix matching glRotatef order: Rx(earthy) Rz(earthx) Ry(earthz)
         ax = math.radians(self.earthy)
@@ -506,10 +581,16 @@ class EarthCanvas(GLCanvas):
             dx, dy, dz = px / length, py / length, pz / length
             return self._intersect_ray(dx, dy, dz, proj_type, ProjectionType)
 
+        # Check if this is a Mercator-type cylindrical projection
+        is_mercator = (proj_type == ProjectionType.Cylindrical and
+                      hasattr(projection, '__class__') and
+                      'Mercator' in projection.__class__.__name__)
+
         # Collect sampled points (flat list for rays/dots) and
         # part-aware intersection lists (for outlines)
         all_intersections = []
         all_sphere_points = []
+        all_latlon = []  # Store original lat/lon for Mercator calculation
         part_intersections = []  # list of lists, one per contiguous part
 
         count = 0
@@ -523,49 +604,109 @@ class EarthCanvas(GLCanvas):
                 part_hits = []
                 for i in range(start, end):
                     count += 1
-                    if count % self.ray_density != 0:
+                    # Sample points: draw N out of every 50 points
+                    # Uses Bresenham-like algorithm for uniform distribution
+                    count_in_window = count % 50
+                    # Draw if this point falls within the selected N points
+                    # Distribute uniformly: point i is drawn if floor(i*N/50) < ceil((i+1)*N/50)
+                    if not ((count_in_window * self.points_per_50) % 50 < self.points_per_50):
                         continue
                     p = points[i]
-                    px, py, pz = sphere_point(p[0], p[1])
-                    hit = ray_intersect(px, py, pz)
-                    if hit is not None:
-                        all_intersections.append(hit)
-                        all_sphere_points.append((px, py, pz))
-                        part_hits.append(hit)
+                    lon_deg, lat_deg = p[0], p[1]
+                    px, py, pz = sphere_point(lon_deg, lat_deg)
+
+                    # Calculate cylinder intersection point
+                    if is_mercator:
+                        # Calculate effective lat/lon with respect to the FIXED vertical cylinder
+                        # After Earth rotation, we need the coordinates in world space
+                        sphere_radius = math.sqrt(px*px + py*py + pz*pz)
+                        if sphere_radius > 1e-9:
+                            # Effective latitude: angle from xy-plane (cylinder equator)
+                            lat_eff = math.asin(pz / sphere_radius)
+                            # Effective longitude: angle around z-axis
+                            # Must match coordinate system: x = r*sin(lon), y = -r*cos(lon)
+                            lon_eff = math.atan2(px, -py)
+
+                            # Convert to degrees for Mercator calculation
+                            lat_eff_deg = math.degrees(lat_eff)
+                            lon_eff_deg = math.degrees(lon_eff)
+
+                            # Use effective lat/lon for Mercator projection
+                            mx, my, mz = self._get_mercator_cylinder_point(lon_eff_deg, lat_eff_deg)
+                            # Apply cylinder unwrap transformation
+                            hit = self._unwrap_point(mx, my, mz)
+
+                            if hit is not None:
+                                all_intersections.append(hit)
+                                all_sphere_points.append((px, py, pz))
+                                # Store effective lat/lon for ray curvature calculation
+                                all_latlon.append((lon_eff_deg, lat_eff_deg))
+                                part_hits.append(hit)
+                        else:
+                            hit = None
+                    else:
+                        # Use geometric projection for other types
+                        hit = ray_intersect(px, py, pz)
+
+                        if hit is not None:
+                            all_intersections.append(hit)
+                            all_sphere_points.append((px, py, pz))
+                            all_latlon.append((lon_deg, lat_deg))
+                            part_hits.append(hit)
                 if len(part_hits) >= 2:
                     part_intersections.append(part_hits)
 
         if not all_intersections:
             return
 
-        # Draw rays as lines from center of earth to projection surface
+        # Disable texture for drawing lines (rays and outlines)
         glDisable(GL_TEXTURE_2D)
-        glLineWidth(1.0)
-        ray_alpha = self.ray_alpha / 100.0  # Convert 0-100 slider to 0.0-1.0
-        glBegin(GL_LINES)
-        glColor4f(0.4, 0.4, 0.0, ray_alpha)
-        for ix, iy, iz in all_intersections:
-            glVertex3f(0, 0, 0)
-            glVertex3f(ix, iy, iz)
-        glEnd()
 
-        # Draw dots at intersections and on earth surface
-        dot_size = max(2.0, min(10.0, 1000.0 / max(1, len(all_intersections))))
-        glPointSize(dot_size)
-        glBegin(GL_POINTS)
-        glColor4f(1.0, 0.0, 0.0, 0.8)
-        for ix, iy, iz in all_intersections:
-            glVertex3f(ix, iy, iz)
-        for sx, sy, sz in all_sphere_points:
-            glVertex3f(sx, sy, sz)
-        glEnd()
+        # Only draw rays and dots when cylinder is fully closed (not unfolding)
+        # During unfolding, the 3D projection concept doesn't apply
+        if self.cylinder_unwrap == 0:
+            # Draw rays showing how projection works
+            # Depth testing is enabled, so Earth will hide the interior portions
+            glLineWidth(1.0)
+            ray_alpha = self.ray_alpha / 100.0  # Convert 0-100 slider to 0.0-1.0
+            glColor4f(0.0, 0.0, 0.7, ray_alpha)
 
-        # Draw continent outlines on projection surface
+            for i, (ix, iy, iz) in enumerate(all_intersections):
+                sphere_pt = all_sphere_points[i]
+
+                if is_mercator:
+                    # Draw ray from center through surface to Mercator cylinder point
+                    # Curvature depends on latitude (straight at equator, curved at poles)
+                    lon_deg, lat_deg = all_latlon[i]
+                    ray_points = self._generate_mercator_ray(sphere_pt, (ix, iy, iz), lat_deg, steps=20)
+                    glBegin(GL_LINE_STRIP)
+                    for px, py, pz in ray_points:
+                        glVertex3f(px, py, pz)
+                    glEnd()
+                else:
+                    # Draw straight ray from center for other projections (geometric projection)
+                    glBegin(GL_LINES)
+                    glVertex3f(0, 0, 0)
+                    glVertex3f(ix, iy, iz)
+                    glEnd()
+
+            # Draw dots at intersections and on earth surface
+            dot_size = max(1.5, min(10.0, 1000.0 / max(1, len(all_intersections))))
+            glPointSize(dot_size)
+            glBegin(GL_POINTS)
+            glColor4f(1.0, 0.0, 0.0, 0.5)
+            for ix, iy, iz in all_intersections:
+                glVertex3f(ix, iy, iz)
+            for sx, sy, sz in all_sphere_points:
+                glVertex3f(sx, sy, sz)
+            glEnd()
+
+        # Draw continent outlines on projection surface (always visible)
         # Switch to standard alpha blending so outlines overlay the surface
         # instead of being washed out by additive blending
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glLineWidth(2.0)
-        glColor4f(0.0, 1.0,0.0, 0.6)
+        glColor4f(0.0, 1.0, 1.0, 0.8)  # Cyan/blue color for continent outlines
         for part_hits in part_intersections:
             for j in range(len(part_hits) - 1):
                 seg = self._interpolate_on_surface(

@@ -58,7 +58,7 @@ class CartographerFrame(wx.Frame):
         self.projection_panel = projection_panel.ProjectionPanel(top_splitter, -1, self)
         self.projection_panel.projection = mercator.MercatorProjection()
         top_splitter.SplitVertically(self.projection_panel, self.settings_splitter)
-        top_splitter.SetSashGravity(0.72)
+        top_splitter.SetSashGravity(0.55)
 
         self.canvas_splitter = wx.SplitterWindow(self.settings_splitter)
         self.earth_canvas = earth_canvas.EarthCanvas(self.canvas_splitter, self)
