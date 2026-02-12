@@ -1,358 +1,494 @@
 import wx
-import wx.adv
+import sys
+import os
+import math
 
-from gui import projection_panel, projection_panel_opengl, earth_canvas, options_window, slider_panel
+# Add parent directory to path so imports work
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from os import listdir
-from projections import aitoff
-from projections import albers
-from projections import equidistant
-from projections import orthographic
-from projections import collignon
-from projections import gnomonic
-from projections import eckertIV
-from projections_configs import empty_config, equal_area_config, albers_config, lambert_config, gnomonic_config
-from projections import equal_area
-from projections import lambert
-from projections import mercator
-from projections import miller
-from projections import mollweide
-from projections import sinusoidal
-from projections import stereographic
-from projections import weichel
-
-import lib.euclid
+import earth_canvas_params
+from gui.projections_configs import dynamic_config
+import earth_canvas
+import projection_panel
+from projections import (mercator, equal_area, miller, sinusoidal, eckertIV,
+                        collignon, mollweide, lambert, albers, orthographic,
+                        equidistant, stereographic, gnomonic, aitoff, weichel)
 import lib.shapefile
-
-ROTATION_STEP = 3
-
-ZONES = {
-    wx.NewId(): ("Europe", (20, -5, 35)),
-    wx.NewId(): ("North America", (-90, -45, 0)),
-    wx.NewId(): ("South America", (243, 170, 147)),
-    wx.NewId(): ("Africa", (10, 0, 0)),
-    wx.NewId(): ("Asia", (85, 41, 0)),
-    wx.NewId(): ("Oceania", (130, 0, 330)),
-    wx.NewId(): ("Antarctica", (120, 0, 280))
-}
+import options_window
 
 class CartographerFrame(wx.Frame):
     def __init__(self):
-        self.shape = ""
-        self.id_shapes = {}
+        wx.Frame.__init__(self, parent=None, title="Cartographer", size=wx.Size(1000, 600))
+
+        self.Bind(wx.EVT_CLOSE, self.OnQuit)
+
+        # Initialize attributes needed by other components
         self.rotationx = 0
         self.rotationy = 0
         self.rotationz = 0
+        self.shape = lib.shapefile.Reader("shapes/ne_50m_coastline/ne_50m_coastline.shp").shapes()
 
-        wx.Frame.__init__(self, parent=None, id=-1, title="Cartographer - Mercator projection", pos=wx.DefaultPosition, size=wx.Size(1000, 600))
+        # Menu tracking
+        self.id_shapes = {}
+        self.current_shape_id = None
+        self.shape_menu = None
+        self.projection_menus = {}
+        self.current_projection_id = None
+        self.options = None  # Options window
 
-        self.Bind(wx.EVT_CLOSE, self.OnQuit)
-        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        # Store reference to left splitter for swapping config panels
+        self.left_splitter = None
 
-        self.CreateStatusBar()
+        # Define zones for "Center on" menu
+        self.zones = {
+            "Europe": (20, -5, 35),
+            "North America": (-90, -45, 0),
+            "South America": (243, 170, 147),
+            "Africa": (10, 0, 0),
+            "Asia": (85, 41, 0),
+            "Oceania": (130, 0, 330),
+            "Antarctica": (120, 0, 280)
+        }
+        self.id_zones = {}
 
-        top_splitter = wx.SplitterWindow(self, style=wx.SP_BORDER)
-        self.settings_splitter = wx.SplitterWindow(top_splitter)
+        # Create a dummy projection_panel attribute for params panel to reference
+        class DummyProjection:
+            class ProjectionType:
+                Cylindrical = 1
+                PseudoCylindrical = 2
+                Conic = 3
+                Azimuthal = 4
 
-        # self.projection_panel = projection_panel_opengl.ProjectionPanelGL(top_splitter, -1, self)
-        self.projection_panel = projection_panel.ProjectionPanel(top_splitter, -1, self)
-        self.projection_panel.projection = mercator.MercatorProjection()
-        top_splitter.SplitVertically(self.projection_panel, self.settings_splitter)
-        top_splitter.SetSashGravity(0.55)
+            def __init__(self):
+                self.projection_type = self.ProjectionType.Cylindrical
 
-        self.canvas_splitter = wx.SplitterWindow(self.settings_splitter)
-        self.earth_canvas = earth_canvas.EarthCanvas(self.canvas_splitter, self)
-        self.slider_panel = slider_panel.SliderPanel(self.canvas_splitter, self)
-        self.canvas_splitter.SplitHorizontally(self.earth_canvas, self.slider_panel)
-        self.canvas_splitter.SetSashGravity(1.0)  # All extra space goes to earth canvas
-        # self.canvas_splitter.SetMinimumPaneSize(1)
-        self.canvas_splitter.SetSashPosition(-110)  # Slider panel gets 100px from bottom
+        class DummyProjectionPanel:
+            def __init__(self):
+                self.resolution = 1
+                self.projection = DummyProjection()
+            def set_resolution(self, value):
+                self.resolution = value
+            def compute_size(self):
+                pass
+            def OnDraw(self):
+                pass
+            def Refresh(self):
+                pass
 
-        self.configuration_panel = empty_config.EmptyPanel(self.settings_splitter)
-        # Don't split initially since Mercator has no params
-        # The splitter will be split/unsplit dynamically in replace_projection
-        self.settings_splitter.Initialize(self.canvas_splitter)
+        self.projection_panel_dummy = DummyProjectionPanel()
 
-        self.configuration_panel.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
-        self.earth_canvas.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
-        self.projection_panel.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        # Create main vertical splitter (left column | right column)
+        main_splitter = wx.SplitterWindow(self)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(top_splitter, 1, wx.EXPAND)
-        self.SetSizer(sizer)
-        self.options = None
+        # LEFT COLUMN: Create splitter for projection + params
+        left_splitter = wx.SplitterWindow(main_splitter)
+        self.left_splitter = left_splitter  # Store reference for config panel swapping
 
+        # Create projection panel container (top of left column)
+        projection_container = wx.Panel(left_splitter)
+        projection_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Create projection panel inside the container
+        self.projection_panel = projection_panel.ProjectionPanel(projection_container, -1, self)
+        self.projection_panel.projection = mercator.MercatorProjection()  # Add Mercator projection
+        self.projection_panel.setShape(self.shape)  # Load shapes
+        projection_sizer.Add(self.projection_panel, 1, wx.EXPAND)
+
+        projection_container.SetSizer(projection_sizer)
+
+        # Define projections (name and projection object only, no config panels)
         self.projections = {
             "&Cylindrical": {
-                wx.NewId(): ("&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)", equal_area.EqualAreaProjection(), equal_area_config.ConfigurationPanel(self.settings_splitter, -1, self)),
-                wx.NewId(): ("&Mercator", mercator.MercatorProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Miller", miller.MillerProjection(), empty_config.EmptyPanel(self.settings_splitter))
+                wx.Window.NewControlId(): ("&Equal Area (Balthasart, Behrmann, Gall, Lambert, Peters, Trystan Edwards)",
+                                          equal_area.EqualAreaProjection()),
+                wx.Window.NewControlId(): ("&Mercator",
+                                          mercator.MercatorProjection()),
+                wx.Window.NewControlId(): ("&Miller",
+                                          miller.MillerProjection())
             },
             "&Pseudo Cylindrical": {
-                wx.NewId(): ("&Sinusoidal", sinusoidal.SinusoidalProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Eckert IV", eckertIV.EckertIVProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Collignon", collignon.CollignonProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("M&ollweide", mollweide.MollweideProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.Window.NewControlId(): ("&Sinusoidal",
+                                          sinusoidal.SinusoidalProjection()),
+                wx.Window.NewControlId(): ("&Eckert IV",
+                                          eckertIV.EckertIVProjection()),
+                wx.Window.NewControlId(): ("&Collignon",
+                                          collignon.CollignonProjection()),
+                wx.Window.NewControlId(): ("M&ollweide",
+                                          mollweide.MollweideProjection())
             },
             "C&onic": {
-                wx.NewId(): ("&Lambert", lambert.LambertProjection(), lambert_config.ConfigurationPanel(self.settings_splitter, -1, self)),
-                wx.NewId(): ("&Albers", albers.AlbersProjection(), albers_config.ConfigurationPanel(self.settings_splitter, -1, self)),
+                wx.Window.NewControlId(): ("&Lambert",
+                                          lambert.LambertProjection()),
+                wx.Window.NewControlId(): ("&Albers",
+                                          albers.AlbersProjection())
             },
             "&Azimuthal": {
-                wx.NewId(): ("&Orthographic", orthographic.AzimuthalOrthographicProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Equidistant", equidistant.AzimuthalEquidistantProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Stereographic", stereographic.StereographicProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Gnomonic", gnomonic.GnomonicProjection(), gnomonic_config.ConfigurationPanel(self.settings_splitter, -1, self)),
-                wx.NewId(): ("&Aitoff", aitoff.AitoffProjection(), empty_config.EmptyPanel(self.settings_splitter)),
-                wx.NewId(): ("&Weichel", weichel.WeichelProjection(), empty_config.EmptyPanel(self.settings_splitter)),
+                wx.Window.NewControlId(): ("&Orthographic",
+                                          orthographic.AzimuthalOrthographicProjection()),
+                wx.Window.NewControlId(): ("&Equidistant",
+                                          equidistant.AzimuthalEquidistantProjection()),
+                wx.Window.NewControlId(): ("&Stereographic",
+                                          stereographic.StereographicProjection()),
+                wx.Window.NewControlId(): ("&Gnomonic",
+                                          gnomonic.GnomonicProjection()),
+                wx.Window.NewControlId(): ("&Aitoff",
+                                          aitoff.AitoffProjection()),
+                wx.Window.NewControlId(): ("&Weichel",
+                                          weichel.WeichelProjection())
             }
         }
+
+        # Create menu bar (after projections are defined)
         self.SetMenuBar(self.create_menu_bar())
-        self.SetStatusText("Ready")
+
+        # Create params panel (bottom of left column)
+        self.params_panel = dynamic_config.DynamicParamsPanel(left_splitter, self)
+        # Initialize with default Mercator projection
+        self.params_panel.set_projection(mercator.MercatorProjection())
+
+        # Split left column into projection (top) and params (bottom)
+        left_splitter.SplitHorizontally(projection_container, self.params_panel)
+        left_splitter.SetSashGravity(1.0)  # Keep params panel at minimum size
+        left_splitter.SetMinimumPaneSize(120)
+        # Set initial sash position to keep params at minimum
+        wx.CallAfter(lambda: left_splitter.SetSashPosition(-150))
+
+        # RIGHT COLUMN: Create splitter for earth + sliders
+        right_splitter = wx.SplitterWindow(main_splitter)
+
+        # Create earth panel container (top of right column)
+        earth_panel_container = wx.Panel(right_splitter)
+        earth_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Create earth canvas inside the container
+        self.earth_canvas = earth_canvas.EarthCanvas(earth_panel_container, self)
+        self.earth_canvas.opengl_shapes = self.shape
+        earth_sizer.Add(self.earth_canvas, 1, wx.EXPAND)
+
+        earth_panel_container.SetSizer(earth_sizer)
+
+        # Create earth canvas params panel (bottom of right column)
+        self.sliders_panel = earth_canvas_params.EarthCanvasParams(right_splitter, self)
+
+        # Split right column into earth (top) and sliders (bottom)
+        right_splitter.SplitHorizontally(earth_panel_container, self.sliders_panel)
+        right_splitter.SetSashGravity(1.0)  # Keep sliders panel at minimum size
+        right_splitter.SetMinimumPaneSize(120)
+        # Set initial sash position to keep sliders at minimum
+        wx.CallAfter(lambda: right_splitter.SetSashPosition(-150))
+
+        # Split main window into left column and right column
+        main_splitter.SplitVertically(left_splitter, right_splitter)
+        main_splitter.SetSashGravity(0.5)
+
+        # Add main splitter to frame
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(main_splitter, 1, wx.EXPAND)
+        self.SetSizer(sizer)
 
     def create_menu_bar(self):
+        """Create the menu bar with all menus"""
         menu_bar = wx.MenuBar()
-        file_menu = wx.Menu()
 
-        ## file menu
-        export_id = wx.NewId()
+        # File menu
+        file_menu = wx.Menu()
+        export_id = wx.Window.NewControlId()
         file_menu.Append(export_id, "&Export projection as Image", "Export the actual projection as an image")
         self.Bind(wx.EVT_MENU, self.OnExport, id=export_id)
-
         file_menu.AppendSeparator()
-
-        quit_id = wx.NewId()
+        quit_id = wx.Window.NewControlId()
         file_menu.Append(quit_id, "&Quit", "Quit Cartographer")
         self.Bind(wx.EVT_MENU, self.OnQuit, id=quit_id)
-
         menu_bar.Append(file_menu, "&File")
 
-        ## projections menu
+        # Projections menu with cylindrical submenu
         menu_projections = wx.Menu()
         for projection_type in self.projections:
-            menu = wx.Menu()
+            submenu = wx.Menu()
             name = str(projection_type) + " Projections"
-            menu_projections.Append(wx.ID_ANY, name, menu)
+            menu_projections.AppendSubMenu(submenu, name)
+
             for projection_id in self.projections[projection_type]:
-                name = self.projections[projection_type][projection_id][0]
-                self.add_projection(menu, projection_id, name, "Sets the " + name + " projection", self.set_projection)
+                proj_name = self.projections[projection_type][projection_id][0]
+                submenu.AppendCheckItem(projection_id, proj_name, "Sets the " + proj_name + " projection")
+                self.projection_menus[projection_id] = submenu  # Store menu reference
+                self.Bind(wx.EVT_MENU, self.OnProjectionChange, id=projection_id)
+                # Set checkmark for default Mercator projection
+                if "&Mercator" in proj_name:
+                    submenu.Check(projection_id, True)
+                    self.current_projection_id = projection_id
         menu_bar.Append(menu_projections, "&Projections")
 
-        ## center menu
-        menu_views = wx.Menu()
-        for zone_id in ZONES:
-            self.add_center(menu_views, zone_id, ZONES[zone_id])
-        menu_bar.Append(menu_views, "&Center")
+        # Center on menu
+        menu_center = wx.Menu()
+        for zone_name, coords in self.zones.items():
+            zone_id = wx.Window.NewControlId()
+            self.id_zones[zone_id] = (zone_name, coords)
+            menu_center.Append(zone_id, zone_name, zone_name)
+            self.Bind(wx.EVT_MENU, self.OnCenter, id=zone_id)
+        menu_bar.Append(menu_center, "&Center on")
 
-        ## shapes menu
+        # Maps menu (resolution selection)
         menu_shapes = wx.Menu()
+        self.shape_menu = menu_shapes
+        shape_mapping = {
+            "Low Resolution (1/110M scale)": "110m_land",
+            "Mid Resolution (1/50M scale)": "ne_50m_coastline",
+            "High Resolution (1/10M scale)": "10m_land",
+            "Countries (1/50M scale)": "ne_50m_admin_0_countries"
+        }
         default_shape_id = None
-        for shape in self.read_shapes():
-            shape_id = wx.NewId()
-            self.id_shapes[shape_id] = shape
-            menu_shapes.Append(shape_id, shape)
+        for friendly_name, shapefile_name in shape_mapping.items():
+            shape_id = wx.Window.NewControlId()
+            self.id_shapes[shape_id] = shapefile_name
+            menu_shapes.AppendCheckItem(shape_id, friendly_name)
             self.Bind(wx.EVT_MENU, self.OnSetShape, id=shape_id)
-            # Set ne_50m_coastline as default, fallback to last shape
-            if shape == "ne_50m_coastline":
-                default_shape_id = shape_id
-            elif default_shape_id is None:
+            # Set Mid Res (ne_50m_coastline) as default
+            if shapefile_name == "ne_50m_coastline":
                 default_shape_id = shape_id
 
         if default_shape_id is not None:
-            self.setShape(default_shape_id)
-        menu_bar.Append(menu_shapes, "&Shapes")
+            menu_shapes.Check(default_shape_id, True)
+            self.current_shape_id = default_shape_id
 
-        ## tools menu
+        menu_bar.Append(menu_shapes, "&Maps")
+
+        # Tools menu
         menu_tools = wx.Menu()
-        options_id = wx.NewId()
-        menu_tools.Append(options_id, "&Option", "Shows the options window")
+        options_id = wx.Window.NewControlId()
+        menu_tools.Append(options_id, "&Options", "Shows the options window")
         self.Bind(wx.EVT_MENU, self.OnOptions, id=options_id)
         menu_bar.Append(menu_tools, "&Tools")
 
-        ## about menu
+        # About menu
         menu_about = wx.Menu()
-        info_id = wx.NewId()
+        info_id = wx.Window.NewControlId()
         menu_about.Append(info_id, "&Info", "Shows info")
         self.Bind(wx.EVT_MENU, self.OnInfo, id=info_id)
         menu_bar.Append(menu_about, "&About")
 
         return menu_bar
 
-    def add_projection(self, menu, id, name, description, function):
-        menu.Append(id, name, description)
-        self.Bind(wx.EVT_MENU, function, id=id)
+    def OnSetShape(self, event):
+        """Handle shape/resolution menu selection"""
+        self.setShape(event.GetId())
 
-    def add_center(self, menu, id, zone):
-        name = zone[0]
-        menu.Append(id, "Center map on " + name, "Centers the map on " + name)
-        self.Bind(wx.EVT_MENU, self.Center, id=id)
+    def setShape(self, shape_id):
+        """Load a new shapefile and update both panels"""
+        shape_name = self.id_shapes[shape_id]
+        self.shape = lib.shapefile.Reader("shapes/" + shape_name + "/" + shape_name + ".shp").shapes()
 
-    def Center(self, event):
-        (x, y, z) = ZONES[event.GetId()][1]
+        # Update both 2D projection panel and 3D OpenGL panel with the same shapes
+        self.projection_panel.setShape(self.shape)
+        self.earth_canvas.opengl_shapes = self.shape
+
+        # Update menu checkmarks
+        if self.current_shape_id is not None:
+            self.shape_menu.Check(self.current_shape_id, False)
+        self.shape_menu.Check(shape_id, True)
+        self.current_shape_id = shape_id
+
+        # Refresh both panels
+        self.projection_panel.Refresh()
+        self.earth_canvas.Refresh()
+
+    def OnProjectionChange(self, event):
+        """Handle projection menu selection"""
+        projection_id = event.GetId()
+
+        # Find the projection in the dictionary
+        for projection_type in self.projections:
+            if projection_id in self.projections[projection_type]:
+                (name, proj_object) = self.projections[projection_type][projection_id]
+
+                # Update the projection
+                self.projection_panel.projection = proj_object
+
+                # Update params panel to show appropriate controls
+                self.params_panel.set_projection(proj_object)
+
+                # Update window title
+                self.SetTitle("Cartographer - " + name.replace('&', '') + " projection")
+
+                # Update projection checkmarks
+                if self.current_projection_id is not None and self.current_projection_id in self.projection_menus:
+                    old_menu = self.projection_menus[self.current_projection_id]
+                    old_menu.Check(self.current_projection_id, False)
+                if projection_id in self.projection_menus:
+                    current_menu = self.projection_menus[projection_id]
+                    current_menu.Check(projection_id, True)
+                    self.current_projection_id = projection_id
+
+                # Refresh display
+                self.projection_panel.Refresh()
+                self.earth_canvas.Refresh()  # Also refresh 3D earth panel
+                break
+
+    def OnCenter(self, event):
+        """Center the view on a specific zone"""
+        zone_name, (x, y, z) = self.id_zones[event.GetId()]
         self.rotationx = x
         self.rotationy = y
         self.rotationz = z
-        self.refresh()
+        # Update projection panel
+        self.projection_panel.rotationx = x
+        self.projection_panel.rotationy = y
+        self.projection_panel.rotationz = z
+        # Update earth canvas
+        self.earth_canvas.set_earth_coordinates(x, y, z)
+        # Refresh both
+        self.projection_panel.Refresh()
+        self.earth_canvas.Refresh()
+
+    def OnExport(self, event):
+        """Export projection as image"""
+        # Ask user for filename
+        wildcard = "PNG files (*.png)|*.png|JPEG files (*.jpg)|*.jpg"
+        dlg = wx.FileDialog(self, "Export projection", wildcard=wildcard,
+                           defaultFile="projection.png",
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        if dlg.ShowModal() == wx.ID_OK:
+            filepath = dlg.GetPath()
+
+            # Add extension if not present
+            if not filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
+                filepath += '.png'
+
+            # Save the current projection panel's content
+            # Get the projection panel's current size
+            panel_width, panel_height = self.projection_panel.GetSize()
+
+            # Create a bitmap and draw the projection
+            bmp = wx.Bitmap(panel_width, panel_height)
+            dc = wx.MemoryDC(bmp)
+
+            # Draw the projection (trigger the same OnPaint logic)
+            self.projection_panel._cache_rotation_matrix()
+            dc.SetBackground(wx.Brush("white"))
+            dc.Clear()
+
+            # Draw grid if enabled
+            if self.projection_panel.paint_grid or self.projection_panel.paint_grid_specials:
+                self.projection_panel.draw_grid(dc)
+
+            # Draw shapes
+            if self.projection_panel.shapes and self.projection_panel.projection:
+                self.projection_panel.projection.set_central_point(
+                    self.projection_panel.rotationx,
+                    self.projection_panel.rotationy
+                )
+                # Use the same drawing code from test_projection_panel
+                dc.SetPen(wx.Pen(self.projection_panel.shapes_color, 1))
+                width_third = panel_width / 3
+                height_third = panel_height / 3
+
+                for shape in self.projection_panel.shapes:
+                    points = shape.points
+                    if len(points) < 2:
+                        continue
+
+                    step = max(1, int(self.projection_panel.resolution))
+                    lines = []
+                    current_line = []
+                    prev_x = None
+                    prev_y = None
+
+                    for i in range(0, len(points), step):
+                        lon, lat = points[i]
+                        try:
+                            lon_rad = math.radians(-lon)
+                            lat_rad = math.radians(lat)
+                            cos_lat = math.cos(lat_rad)
+                            sx = cos_lat * math.cos(lon_rad)
+                            sy = cos_lat * math.sin(lon_rad)
+                            sz = math.sin(lat_rad)
+
+                            px = self.projection_panel._rot_a * sx + self.projection_panel._rot_b * sy + self.projection_panel._rot_c * sz
+                            py = self.projection_panel._rot_d * sx + self.projection_panel._rot_e * sy + self.projection_panel._rot_f * sz
+                            pz = self.projection_panel._rot_g * sx + self.projection_panel._rot_h * sy + self.projection_panel._rot_i * sz
+
+                            lat_eff = math.asin(math.radians(pz))
+                            lon_eff = math.atan2(math.radians(py), math.radians(px))
+                            proj_x, proj_y = self.projection_panel.projection.get_coords(-lon_eff, -lat_eff * 90)
+
+                            x = int(proj_x * self.projection_panel.mf + self.projection_panel.tx)
+                            y = int(proj_y * self.projection_panel.mf + self.projection_panel.ty)
+
+                            if prev_x is not None:
+                                dx = x - prev_x
+                                dy = y - prev_y
+                                if abs(dx) < width_third and abs(dy) < height_third:
+                                    current_line.append((x, y))
+                                else:
+                                    if len(current_line) > 1:
+                                        lines.append(current_line)
+                                    current_line = [(x, y)]
+                            else:
+                                current_line.append((x, y))
+
+                            prev_x = x
+                            prev_y = y
+                        except:
+                            if len(current_line) > 1:
+                                lines.append(current_line)
+                            current_line = []
+                            prev_x = None
+                            prev_y = None
+
+                    if len(current_line) > 1:
+                        lines.append(current_line)
+
+                    for line in lines:
+                        if len(line) > 1:
+                            dc.DrawLines(line)
+
+            # Save the bitmap
+            dc.SelectObject(wx.NullBitmap)
+            bmp.SaveFile(filepath, wx.BITMAP_TYPE_PNG)
+            wx.MessageBox(f"Projection exported to {filepath}", "Export Complete", wx.OK | wx.ICON_INFORMATION)
+        dlg.Destroy()
 
     def OnOptions(self, event):
-        self.options = options_window.Options(None, self)
-        self.options.Show(True)
+        """Show options window"""
+        if self.options is None or not self.options.IsShown():
+            self.options = options_window.Options(None, self)
+            self.options.Show(True)
+        else:
+            self.options.Raise()  # Bring to front if already open
+
+    def OnInfo(self, event):
+        """Show about/info dialog"""
+        licence_text = """Cartographer is free software; you can redistribute
+it and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the License,
+or (at your option) any later version.
+
+Cartographer is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details."""
+
+        info_text = """Cartographer - Map Projection Visualization Tool
+
+A tool for exploring and visualizing different map projections.
+
+License:
+""" + licence_text
+
+        wx.MessageBox(info_text, "About Cartographer", wx.OK | wx.ICON_INFORMATION)
 
     def OnQuit(self, event):
         if self.options:
             self.options.Destroy()
         self.Destroy()
 
-    def OnKeyDown(self, event):
-        key = event.GetKeyCode()
-        if key == wx.WXK_LEFT or key == wx.WXK_NUMPAD_LEFT:
-            self.rotationx -= ROTATION_STEP
-            self.projection_panel.rotationx = self.rotationx
-            self.projection_panel.Refresh()
-        elif key == wx.WXK_RIGHT or key == wx.WXK_NUMPAD_RIGHT:
-            self.rotationx += ROTATION_STEP
-            self.projection_panel.rotationx = self.rotationx
-            self.projection_panel.Refresh()
-        elif key == wx.WXK_UP or key == wx.WXK_NUMPAD_UP:
-            self.rotationy -= ROTATION_STEP
-            self.projection_panel.rotationy = self.rotationy
-            self.projection_panel.Refresh()
-        elif key == wx.WXK_DOWN or key == wx.WXK_NUMPAD_DOWN:
-            self.rotationy += ROTATION_STEP
-            self.projection_panel.rotationy = self.rotationy
-            self.projection_panel.Refresh()
-        elif key == wx.WXK_PAGEUP or key == wx.WXK_NUMPAD_PAGEUP:
-            self.rotationz -= ROTATION_STEP
-            self.projection_panel.rotationz = self.rotationz
-            self.projection_panel.Refresh()
-        elif key == wx.WXK_PAGEDOWN or key == wx.WXK_NUMPAD_PAGEDOWN:
-            self.rotationz += ROTATION_STEP
-            self.projection_panel.rotationz = self.rotationz
-            self.projection_panel.Refresh()
-
-    def OnSetShape(self, event):
-        self.setShape(event.GetId())
-
-    def setShape(self, shape):
-        shape_name = self.id_shapes[shape]
-        self.shape = lib.shapefile.Reader("shapes/" + shape_name + "/" + shape_name + ".shp").shapes()
-        self.projection_panel.setShape(self.shape)
-        self.refresh()
-
     def getShape(self):
         return self.shape
 
-    def refresh(self):
-        self.projection_panel.set_coordinates(self.rotationx, self.rotationy, self.rotationz)
-        self.earth_canvas.set_earth_coordinates(self.rotationx, self.rotationy, self.rotationz)
-
-        self.projection_panel.Refresh()
-        self.earth_canvas.Refresh()
-
-    def set_projection(self, event):
-        for projection_type in self.projections:
-            if event.GetId() in self.projections[projection_type]:
-                (name, proj_function, config_function) = self.projections[projection_type].get(event.GetId())
-                self.replace_projection(name, proj_function, config_function)
-                break
-
-    def replace_projection(self, name, new_projection, new_configuration):
-        self.projection_panel.projection = new_projection
-
-        is_empty = isinstance(new_configuration, empty_config.EmptyPanel)
-        is_split = self.settings_splitter.IsSplit()
-
-        if is_empty:
-            # No parameters - unsplit if currently split
-            if is_split:
-                self.settings_splitter.Unsplit()
-        else:
-            # Has parameters - need to show config panel
-            if is_split:
-                # Already split, just replace the window
-                old_conf = self.settings_splitter.GetWindow2()
-                old_conf.Hide()
-                new_configuration.Show()
-                self.settings_splitter.ReplaceWindow(old_conf, new_configuration)
-            else:
-                # Not split, need to split
-                new_configuration.Show()
-                self.settings_splitter.SplitHorizontally(self.canvas_splitter, new_configuration)
-                self.settings_splitter.SetSashGravity(0.25)
-
-        self.configuration_panel = new_configuration
-        self.SetTitle("Cartographer - " + name.replace('&', '') + " projection")
-        self.refresh()
-
-    def OnExport(self, event):
-        height = 2000
-        width = 4000
-        mem = wx.MemoryDC()
-        image = wx.Bitmap(width, height)
-        mem.SelectObject(image)
-
-        proj_panel = projection_panel.ProjectionPanel(self, -1, self)
-        proj_panel.projection = self.projection_panel.projection
-        proj_panel.resolution = 1
-        proj_panel.grid_resolution = 1
-        proj_panel.set_paint_grid(self.projection_panel.paint_grid)
-        proj_panel.set_paint_grid_specials(self.projection_panel.paint_grid_specials)
-        proj_panel.rotationx = self.projection_panel.rotationx
-        proj_panel.rotationy = self.projection_panel.rotationy
-        proj_panel.rotationz = self.projection_panel.rotationz
-        proj_panel.width = width
-        proj_panel.height = height
-        proj_panel.mf = height / float(180)
-        proj_panel.tx = proj_panel.mf * 180 + (width - proj_panel.mf * 360) / 2
-        proj_panel.ty = proj_panel.mf * 90
-        proj_panel.OnDraw(mem, width, height)
-
-        dlg = wx.FileDialog(self, "Choose a file name to save the image as a PNG to", defaultDir="", defaultFile="", wildcard="*.png", style=wx.FD_SAVE)
-        if dlg.ShowModal() != wx.ID_OK:
-            return
-
-        filename = dlg.GetPath()
-        if not filename[-4] == ".png":
-            filename = filename + ".png"
-
-        image.SaveFile(filename, wx.BITMAP_TYPE_PNG)
-        proj_panel.Destroy()
-
-    def read_shapes(self):
-        shapes_dirs = [f for f in listdir("shapes")]
-        return shapes_dirs
-
-    def OnInfo(self, event):
-
-        licence = """Cartographer is free software; you can redistribute
-it and/or modify it under the terms of the GNU General Public License as 
-published by the Free Software Foundation; either version 2 of the License, 
-or (at your option) any later version.
-
-Cartographer is distributed in the hope that it will be useful, 
-but WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
-
-See the GNU General Public License for more details. You should have 
-received a copy of the GNU General Public License along with File Hunter; 
-if not, write to the Free Software Foundation, Inc., 59 Temple Place, 
-Suite 330, Boston, MA  02111-1307  USA"""
-
-        author = "Andrea Iacono (andrea.iacono.nl@gmail.com)"
-        credits = author + "\n\nThe sources of this project are available at:\nhttp://www.github.com/andreaiacono/cartographer"
-
-        info = wx.adv.AboutDialogInfo()
-        info.SetIcon(wx.Icon('img/mercator.jpg', wx.BITMAP_TYPE_JPEG))
-        info.SetName('Cartographer')
-        info.SetVersion('0.8')
-        info.SetDescription("Cartographer is a simple cartography application for making earth maps in real-time")
-        info.SetCopyright('(C) 2012-2020 Andrea Iacono')
-        info.SetWebSite('http://www.github.com/andreaiacono/cartographer')
-        info.SetLicence(licence)
-        info.AddDeveloper(credits)
-        info.AddDocWriter(author)
-
-        wx.adv.AboutBox(info)
+    def set_earth_coordinates(self, x, y, z):
+        self.rotationx = x
+        self.rotationy = y
+        self.rotationz = z
 
 
 class CartographerApplication(wx.App):
@@ -360,9 +496,13 @@ class CartographerApplication(wx.App):
         frame = CartographerFrame()
         frame.Show(True)
         self.SetTopWindow(frame)
-        # self.SetSize(800, 600)
+
+        # Force initial refresh of earth canvas after window is shown
+        wx.CallAfter(frame.earth_canvas.Refresh)
+
         return True
 
 
-app = CartographerApplication(redirect=False)
-app.MainLoop()
+if __name__ == '__main__':
+    app = CartographerApplication(redirect=False)
+    app.MainLoop()

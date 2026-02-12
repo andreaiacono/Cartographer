@@ -11,26 +11,23 @@ class Options(wx.Frame):
 
         fgs = wx.FlexGridSizer(3, 10, 5)
         fgs.AddGrowableCol(1, 1)
-        label_res = wx.StaticText(panel, label="Projection Resolution       HiRes")
-        label_res_end = wx.StaticText(panel, label=" LowRes")
-        # label_grid_res = wx.StaticText(panel, label="Grid Resolution                   HiRes")
-        # label_grid_res_end = wx.StaticText(panel, label=" LowRes")
 
-        self.slider_proj_res = wx.Slider(panel, minValue=1, maxValue=cartographer.projection_panel.resolution_scale, style=wx.SL_HORIZONTAL)
-        self.slider_proj_res.SetValue(cartographer.projection_panel.resolution)
+        label_parallel_number = wx.StaticText(panel, label="Parallels to draw")
+        label_meridian_number = wx.StaticText(panel, label="Meridians to draw")
+        label_shapes_color = wx.StaticText(panel, label="Shapes color")
+        label_grid_color = wx.StaticText(panel, label="Grid color")
 
-        label_parallel_number = wx.StaticText(panel, label="\nParallels to draw")
-        label_meridian_number = wx.StaticText(panel, label="\n Meridians to draw")
+        self.slider_parallel_number = wx.Slider(panel, minValue=2, maxValue=60, value=3, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
+        self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=120, value=6, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
 
-        self.slider_parallel_number = wx.Slider(panel, minValue=2, maxValue=60, value=6, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
-        self.slider_meridian_number = wx.Slider(panel, minValue=1, maxValue=120, value=9, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
+        # Color pickers
+        self.color_shapes = wx.ColourPickerCtrl(panel, colour=cartographer.projection_panel.shapes_color)
+        self.color_grid = wx.ColourPickerCtrl(panel, colour=cartographer.projection_panel.grid_color)
 
         self.check_draw_frame = wx.CheckBox(panel, label='Draw Frame')
         self.check_draw_grid = wx.CheckBox(panel, label='Draw meridians and parallels')
         self.check_draw_specials = wx.CheckBox(panel, label='Draw Special Parallels')
         self.check_draw_tissot = wx.CheckBox(panel, label="Draw Tissot's Indicatrix")
-        self.check_draw_rays = wx.CheckBox(panel, label='Draw Projection Rays')
-        self.check_draw_rays.SetValue(cartographer.earth_canvas.draw_rays)
 
         self.check_draw_frame.SetValue(cartographer.projection_panel.paint_frame)
         self.check_draw_grid.SetValue(cartographer.projection_panel.paint_grid)
@@ -39,10 +36,7 @@ class Options(wx.Frame):
 
         self.Bind(wx.EVT_SLIDER, self.on_slider_change)
         self.Bind(wx.EVT_CHECKBOX, self.on_slider_change)
-
-        fgs.Add(label_res)
-        fgs.Add(self.slider_proj_res, 1, wx.EXPAND)
-        fgs.Add(label_res_end)
+        self.Bind(wx.EVT_COLOURPICKER_CHANGED, self.on_color_change)
 
         fgs.Add(self.check_draw_frame, 1, wx.EXPAND)
         fgs.Add(wx.StaticText(panel))
@@ -52,14 +46,6 @@ class Options(wx.Frame):
         fgs.Add(wx.StaticText(panel))
         fgs.Add(wx.StaticText(panel))
 
-        # fgs.Add(label_grid_res, 1, wx.EXPAND)
-        # fgs.Add(self.slider_grid_res, 1, wx.EXPAND)
-        # fgs.Add(label_grid_res_end)
-        #
-        # fgs.Add(label_grid_res, 1, wx.EXPAND)
-        # fgs.Add(self.slider_grid_res, 1, wx.EXPAND)
-        # fgs.Add(label_grid_res_end)
-        #
         fgs.Add(label_meridian_number)
         fgs.Add(self.slider_meridian_number, 1, wx.EXPAND)
         fgs.Add(wx.StaticText(panel))
@@ -76,8 +62,12 @@ class Options(wx.Frame):
         fgs.Add(wx.StaticText(panel))
         fgs.Add(wx.StaticText(panel))
 
-        fgs.Add(self.check_draw_rays, 1, wx.EXPAND)
+        fgs.Add(label_shapes_color)
+        fgs.Add(self.color_shapes, 1, wx.EXPAND)
         fgs.Add(wx.StaticText(panel))
+
+        fgs.Add(label_grid_color)
+        fgs.Add(self.color_grid, 1, wx.EXPAND)
         fgs.Add(wx.StaticText(panel))
 
         # fgs.AddMany([
@@ -95,9 +85,6 @@ class Options(wx.Frame):
         panel.SetSizer(hbox)
 
     def on_slider_change(self, event):
-
-        self.cartographer.projection_panel.set_resolution(self.slider_proj_res.GetValue())
-        # self.cartographer.projection_panel.set_grid_resolution(self.slider_grid_res.GetValue())
         self.cartographer.projection_panel.set_paint_frame(self.check_draw_frame.GetValue())
         self.cartographer.projection_panel.set_paint_grid(self.check_draw_grid.GetValue())
         self.cartographer.projection_panel.set_draw_tissot(self.check_draw_tissot.GetValue())
@@ -105,11 +92,14 @@ class Options(wx.Frame):
         self.cartographer.projection_panel.set_meridian_number(self.slider_meridian_number.GetValue()-1)
         self.cartographer.projection_panel.set_parallel_number(self.slider_parallel_number.GetValue())
 
-        self.cartographer.earth_canvas.draw_rays = self.check_draw_rays.GetValue()
-        self.cartographer.earth_canvas.Refresh()
-
         self.cartographer.projection_panel.compute_size()
         self.cartographer.projection_panel.OnDraw()
+        self.cartographer.projection_panel.Refresh()
+
+    def on_color_change(self, event):
+        """Handle color picker changes"""
+        self.cartographer.projection_panel.set_shapes_color(self.color_shapes.GetColour())
+        self.cartographer.projection_panel.set_grid_color(self.color_grid.GetColour())
         self.cartographer.projection_panel.Refresh()
 
 

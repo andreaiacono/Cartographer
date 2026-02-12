@@ -13,7 +13,11 @@ class EqualAreaProjection(GenericProjection):
 
 
 	def get_coords(self, x, y):
-		return 1.5 * math.degrees(x) * self.cos_standard_latitude, 100 * math.sin(y) * self.sec_standard_latitude
+		# Cylindrical equal-area projection formula:
+		# x_proj = λ * cos(φ₀)  [longitude scaled by cosine of standard parallel]
+		# y_proj = sin(φ) / cos(φ₀)  [sine of latitude divided by cosine of standard parallel]
+		# Scale up by 1.5 for x and 90 for y to make the map larger and fill canvas better
+		return 1.5 * math.degrees(x) * self.cos_standard_latitude, 90 * math.sin(y) / self.cos_standard_latitude
 
 	def set_standard_latitude(self, val):
 		self.cos_standard_latitude = math.cos(val)

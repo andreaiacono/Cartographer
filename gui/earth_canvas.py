@@ -40,7 +40,7 @@ class EarthCanvas(GLCanvas):
         self.standard_parallel1 = 15
         self.standard_parallel2 = 15
         self.draw_rays = True
-        self.points_per_50 = 30  # Default: draw 30 out of every 50 points (60%)
+        self.resolution = 1.0  # Default: low resolution (ranges from 0 to 7.5)
         self.ray_alpha = 50  # 0-100, will be converted to 0.0-1.0
         self.cylinder_unwrap = 0
         self.earth_texture = None
@@ -56,10 +56,16 @@ class EarthCanvas(GLCanvas):
         self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
         self.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
 
-        # Load 110m_land shapes for OpenGL panel (lower detail for performance)
-        self.opengl_shapes = lib.shapefile.Reader("shapes/110m_land/110m_land.shp").shapes()
+        # Shapes will be loaded by main.py setShape() to match the menu selection
+        self.opengl_shapes = []
 
     def InitGL(self):
+        # Initialize GLUT for text rendering
+        try:
+            glutInit()
+        except:
+            pass  # Already initialized
+
         # the earth texture
         image = open("textures/earth_mid.jpg")
         ix = image.size[0]
@@ -147,7 +153,19 @@ class EarthCanvas(GLCanvas):
 
         if self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Cylindrical or \
                         self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.PseudoCylindrical:
-            cyl_size = 6
+            # Check if it's an Equal Area projection - adjust cylinder height based on standard latitude
+            from projections import equal_area
+            if isinstance(self.cartographer.projection_panel.projection, equal_area.EqualAreaProjection):
+                # Cylinder height depends on standard latitude
+                # Increased from 3.0 to 4.0 for more clearance at top/bottom
+                projection = self.cartographer.projection_panel.projection
+                if hasattr(projection, 'cos_standard_latitude'):
+                    cos_std_lat = projection.cos_standard_latitude
+                    cyl_size = 4.0 / cos_std_lat  # Dynamic height based on standard latitude
+                else:
+                    cyl_size = 6.0  # Fallback
+            else:
+                cyl_size = 8  # Increased from 6 to 8 for more clearance for Mercator, Miller, etc.
             glPushMatrix()
             # Keep cylinder fixed (vertical) - Earth rotates inside it
             # This shows what happens when different great circles become tangent to the cylinder
@@ -161,6 +179,9 @@ class EarthCanvas(GLCanvas):
             else:
                 self.draw_cylinder_surface(cyl_size)
             glPopMatrix()
+            # Draw "Projection" text at bottom of cylinder
+            if self.cylinder_unwrap == 0:
+                self.draw_cylinder_label(cyl_size)
             if self.draw_rays:
                 self.draw_shape_rays()
             glDisable(GL_BLEND)
@@ -304,6 +325,103 @@ class EarthCanvas(GLCanvas):
                 glTexCoord2f(s, t1)
                 glVertex3f(x1, y1, zz1)
             glEnd()
+
+    def draw_cylinder_label(self, cyl_size):
+        """Draw short vertical lines at top and bottom of cylinder to show it's stationary."""
+        r = self.earth_radius * 1.01
+        height = self.earth_radius * cyl_size
+
+        glPushMatrix()
+        glTranslatef(0.0, 0.0, -height / 2)
+
+        # Disable textures
+        glDisable(GL_TEXTURE_2D)
+        glDisable(GL_LIGHTING)
+
+        # Draw 8 short vertical lines evenly spaced around the cylinder
+        glColor4f(0.7, 0.7, 0.7, 0.4)  # Gray with less opacity
+        glLineWidth(2.0)
+
+        line_length = 0.3  # Length of the short lines
+        n_lines = 8  # Number of lines around the cylinder
+
+        for i in range(n_lines):
+            angle = 2 * math.pi * i / n_lines  # Every 45 degrees
+            x = r * math.cos(angle)
+            y = r * math.sin(angle)
+
+            # Line at bottom
+            glBegin(GL_LINES)
+            glVertex3f(x, y, 0)
+            glVertex3f(x, y, line_length)
+            glEnd()
+
+            # Line at top
+            glBegin(GL_LINES)
+            glVertex3f(x, y, height - line_length)
+            glVertex3f(x, y, height)
+            glEnd()
+
+        glLineWidth(1.0)
+
+        # Draw longitude labels (0, 90, 180, 270) as if printed on cylinder surface
+        # Using the coordinate system: x = r*sin(lon), y = -r*cos(lon)
+        glColor4f(0.3, 0.3, 0.3, 0.9)  # Dark gray for better contrast
+        glLineWidth(2.0)
+
+        # Longitude positions: rotate by 270° from standard to put 0° at front
+        longitudes = [
+            (0, 0, -r),      # 0° at front (negative y) - Prime Meridian
+            (90, r, 0),      # 90°E at right (positive x)
+            (180, 0, r),     # 180° at back (positive y) - Date Line
+            (270, -r, 0)     # 270° (or -90°W) at left (negative x)
+        ]
+
+        text_scale = 0.004  # Scale for stroke text (increased for larger font size)
+        text_z_offset_bottom = 0.6  # Distance from bottom base
+        text_z_offset_top = 0.9     # Distance from top base (larger to avoid bars)
+
+        for lon_deg, x, y in longitudes:
+            label = str(lon_deg)
+
+            # Calculate angle for this position (to orient text tangent to cylinder)
+            angle = math.atan2(y, x)
+
+            # Position directly on cylinder surface (no offset)
+            text_x = x
+            text_y = y
+
+            # Draw at bottom
+            glPushMatrix()
+            glTranslatef(text_x, text_y, text_z_offset_bottom)
+            glRotatef(math.degrees(angle) + 90, 0, 0, 1)  # Rotate around cylinder
+            glRotatef(90, 1, 0, 0)  # Tilt to lie flat on cylinder surface
+            glScalef(text_scale, text_scale, text_scale)
+            # Center the text
+            text_width = len(label) * 104.76  # Approximate width for GLUT_STROKE_ROMAN
+            glTranslatef(-text_width / 2, 0, 0)
+            for c in label:
+                glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(c))
+            glPopMatrix()
+
+            # Draw at top (further from base to avoid vertical bars)
+            glPushMatrix()
+            glTranslatef(text_x, text_y, height - text_z_offset_top)
+            glRotatef(math.degrees(angle) + 90, 0, 0, 1)  # Rotate around cylinder
+            glRotatef(90, 1, 0, 0)  # Tilt to lie flat on cylinder surface
+            glScalef(text_scale, text_scale, text_scale)
+            # Center the text
+            glTranslatef(-text_width / 2, 0, 0)
+            for c in label:
+                glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(c))
+            glPopMatrix()
+
+        glLineWidth(1.0)
+
+        glPopMatrix()
+
+        # Re-enable textures
+        glEnable(GL_TEXTURE_2D)
 
     def _intersect_ray(self, dx, dy, dz, proj_type, ProjectionType):
         """Compute intersection of a ray from origin with the projection surface.
@@ -494,6 +612,38 @@ class EarthCanvas(GLCanvas):
 
         return (x, y, z)
 
+    def _get_equal_area_cylinder_point(self, lon_deg, lat_deg):
+        """Calculate where a point at given lat/lon should appear on the cylinder using Equal Area formula.
+
+        Returns (x, y, z) on the cylinder surface where:
+        - x, y define the position around the cylinder (from longitude)
+        - z is the height using Equal Area formula: r * sin(lat) / cos(standard_latitude)
+        """
+        r = self.earth_radius
+        cyl_r = r * 1.01  # Same radius as cylinder
+
+        lon = math.radians(lon_deg)
+        lat = math.radians(lat_deg)
+
+        # Position around cylinder (from longitude)
+        # Match the coordinate system: negative sin for x, negative cos for y
+        x = cyl_r * math.sin(lon)
+        y = -cyl_r * math.cos(lon)
+
+        # Get the standard latitude from the Equal Area projection
+        projection = self.cartographer.projection_panel.projection
+        if hasattr(projection, 'cos_standard_latitude'):
+            cos_std_lat = projection.cos_standard_latitude
+        else:
+            cos_std_lat = 1.0  # Fallback if not available
+
+        # Height using Equal Area formula: z = r * sin(lat) / cos(standard_latitude)
+        # Scale to match the 2D projection's vertical extent
+        # The 2D uses 90 * sin(lat) / cos(std_lat), so we scale proportionally
+        z = r * 1.5 * math.sin(lat) / cos_std_lat
+
+        return (x, y, z)
+
     def _generate_mercator_ray(self, sphere_pt, mercator_pt, lat_deg, steps=20):
         """Generate a ray from Earth's center through surface, curving to Mercator point.
 
@@ -533,13 +683,52 @@ class EarthCanvas(GLCanvas):
 
         return points
 
+    def _generate_equal_area_ray(self, sphere_pt, equal_area_pt, lat_deg, steps=20):
+        """Generate a ray from Earth's center through surface, curving to Equal Area point.
+
+        The ray shows:
+        - Center to surface: straight radial line (hidden inside Earth)
+        - Surface to cylinder: smooth curve to Equal Area-corrected position
+
+        Equal Area has less vertical distortion than Mercator:
+        - Height adjustment is proportional to sin(lat) rather than asinh(tan(lat))
+        - Less extreme curvature at high latitudes
+        """
+        sx, sy, sz = sphere_pt
+        ex, ey, ez = equal_area_pt
+
+        points = [(0, 0, 0)]  # Start from Earth's center
+
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+
+            if t <= 0.5:
+                # From center to sphere surface: straight radial line (INSIDE Earth)
+                # This portion is hidden by depth buffer
+                scale = t * 2.0
+                x, y, z = scale * sx, scale * sy, scale * sz
+            else:
+                # From surface to Equal Area point: smooth curve (VISIBLE)
+                t_curve = (t - 0.5) * 2.0  # 0 to 1 for curve segment
+
+                # Smooth easing using smoothstep
+                smooth = t_curve * t_curve * (3 - 2 * t_curve)
+
+                x = sx + smooth * (ex - sx)
+                y = sy + smooth * (ey - sy)
+                z = sz + smooth * (ez - sz)
+
+            points.append((x, y, z))
+
+        return points
+
     def draw_shape_rays(self):
         r = self.earth_radius
         projection = self.cartographer.projection_panel.projection
         proj_type = projection.projection_type
         ProjectionType = projection.ProjectionType
 
-        # Use 110m_land shapes for OpenGL panel (better performance)
+        # Use shapes selected from Resolution menu (synced with 2D panel)
         shapes = self.opengl_shapes
 
         # Build rotation matrix matching glRotatef order: Rx(earthy) Rz(earthx) Ry(earthz)
@@ -586,6 +775,11 @@ class EarthCanvas(GLCanvas):
                       hasattr(projection, '__class__') and
                       'Mercator' in projection.__class__.__name__)
 
+        # Check if this is an Equal Area cylindrical projection
+        is_equal_area = (proj_type == ProjectionType.Cylindrical and
+                        hasattr(projection, '__class__') and
+                        'EqualArea' in projection.__class__.__name__)
+
         # Collect sampled points (flat list for rays/dots) and
         # part-aware intersection lists (for outlines)
         all_intersections = []
@@ -604,19 +798,21 @@ class EarthCanvas(GLCanvas):
                 part_hits = []
                 for i in range(start, end):
                     count += 1
-                    # Sample points: draw N out of every 50 points
-                    # Uses Bresenham-like algorithm for uniform distribution
+
+                    # Sample points based on resolution
+                    # resolution=0: draws nothing
+                    # resolution=1.0 to 7.5: draws 2% to 15% of points
+                    # Linear relationship: resolution/50 = fraction of points drawn
                     count_in_window = count % 50
-                    # Draw if this point falls within the selected N points
-                    # Distribute uniformly: point i is drawn if floor(i*N/50) < ceil((i+1)*N/50)
-                    if not ((count_in_window * self.points_per_50) % 50 < self.points_per_50):
+                    if not ((count_in_window * self.resolution) % 50 < self.resolution):
                         continue
+
                     p = points[i]
                     lon_deg, lat_deg = p[0], p[1]
                     px, py, pz = sphere_point(lon_deg, lat_deg)
 
                     # Calculate cylinder intersection point
-                    if is_mercator:
+                    if is_mercator or is_equal_area:
                         # Calculate effective lat/lon with respect to the FIXED vertical cylinder
                         # After Earth rotation, we need the coordinates in world space
                         sphere_radius = math.sqrt(px*px + py*py + pz*pz)
@@ -627,12 +823,15 @@ class EarthCanvas(GLCanvas):
                             # Must match coordinate system: x = r*sin(lon), y = -r*cos(lon)
                             lon_eff = math.atan2(px, -py)
 
-                            # Convert to degrees for Mercator calculation
+                            # Convert to degrees for projection calculation
                             lat_eff_deg = math.degrees(lat_eff)
                             lon_eff_deg = math.degrees(lon_eff)
 
-                            # Use effective lat/lon for Mercator projection
-                            mx, my, mz = self._get_mercator_cylinder_point(lon_eff_deg, lat_eff_deg)
+                            # Use effective lat/lon for the appropriate projection
+                            if is_mercator:
+                                mx, my, mz = self._get_mercator_cylinder_point(lon_eff_deg, lat_eff_deg)
+                            else:  # is_equal_area
+                                mx, my, mz = self._get_equal_area_cylinder_point(lon_eff_deg, lat_eff_deg)
                             # Apply cylinder unwrap transformation
                             hit = self._unwrap_point(mx, my, mz)
 
@@ -683,6 +882,15 @@ class EarthCanvas(GLCanvas):
                     for px, py, pz in ray_points:
                         glVertex3f(px, py, pz)
                     glEnd()
+                elif is_equal_area:
+                    # Draw ray from center through surface to Equal Area cylinder point
+                    # Less curvature than Mercator (sin vs asinh(tan))
+                    lon_deg, lat_deg = all_latlon[i]
+                    ray_points = self._generate_equal_area_ray(sphere_pt, (ix, iy, iz), lat_deg, steps=20)
+                    glBegin(GL_LINE_STRIP)
+                    for px, py, pz in ray_points:
+                        glVertex3f(px, py, pz)
+                    glEnd()
                 else:
                     # Draw straight ray from center for other projections (geometric projection)
                     glBegin(GL_LINES)
@@ -690,30 +898,78 @@ class EarthCanvas(GLCanvas):
                     glVertex3f(ix, iy, iz)
                     glEnd()
 
-            # Draw dots at intersections and on earth surface
-            dot_size = max(1.5, min(10.0, 1000.0 / max(1, len(all_intersections))))
-            glPointSize(dot_size)
-            glBegin(GL_POINTS)
-            glColor4f(1.0, 0.0, 0.0, 0.5)
-            for ix, iy, iz in all_intersections:
-                glVertex3f(ix, iy, iz)
-            for sx, sy, sz in all_sphere_points:
-                glVertex3f(sx, sy, sz)
-            glEnd()
-
-        # Draw continent outlines on projection surface (always visible)
-        # Switch to standard alpha blending so outlines overlay the surface
-        # instead of being washed out by additive blending
+        # Draw continent outlines on projection surface
+        # Vary alpha based on facing toward light/camera
+        # Account for both view rotation (posx/y/z) to simulate fixed light source
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glLineWidth(2.0)
-        glColor4f(0.0, 1.0, 1.0, 0.8)  # Cyan/blue color for continent outlines
+
+        # Precompute view rotation matrix (posy=X, posx=Z, posz=Y)
+        import math as m
+        _cos, _sin, _rad = m.cos, m.sin, m.radians
+
+        cy, sy = _cos(_rad(self.posy)), _sin(_rad(self.posy))  # X rotation
+        cx, sx = _cos(_rad(self.posx)), _sin(_rad(self.posx))  # Z rotation
+        cz, sz = _cos(_rad(self.posz)), _sin(_rad(self.posz))  # Y rotation
+
+        # Apply view rotations in order: Y (posy), Z (posx), Y (posz)
+        def rotate_to_view(x, y, z):
+            # Apply posy (X rotation)
+            x1 = x
+            y1 = cy * y - sy * z
+            z1 = sy * y + cy * z
+            # Apply posx (Z rotation)
+            x2 = cx * x1 - sx * y1
+            y2 = sx * x1 + cx * y1
+            z2 = z1
+            # Apply posz (Y rotation)
+            x3 = cz * x2 + sz * z2
+            y3 = y2
+            z3 = -sz * x2 + cz * z2
+            return x3, y3, z3
+
+        cyl_radius = r * 1.01
+
         for part_hits in part_intersections:
             for j in range(len(part_hits) - 1):
+                # Check if we're unfolding and if points are on opposite sides of the gap
+                if self.cylinder_unwrap > 0:
+                    p1 = part_hits[j]
+                    p2 = part_hits[j + 1]
+                    # Calculate angles around cylinder for both points
+                    theta1 = m.atan2(p1[1], p1[0])
+                    theta2 = m.atan2(p2[1], p2[0])
+                    # Calculate angular distance (accounting for wraparound)
+                    angle_diff = abs(theta2 - theta1)
+                    if angle_diff > m.pi:
+                        angle_diff = 2 * m.pi - angle_diff
+                    # If points are far apart angularly (> 90°), they're on opposite sides of gap
+                    # Skip drawing this segment to avoid lines crossing the gap
+                    if angle_diff > m.pi / 2:
+                        continue
+
                 seg = self._interpolate_on_surface(
                     part_hits[j], part_hits[j + 1], proj_type, ProjectionType)
                 if len(seg) >= 2:
                     glBegin(GL_LINE_STRIP)
                     for sx, sy, sz in seg:
+                        # Calculate surface normal for cylinder (radial direction)
+                        # Normal is perpendicular to Z axis, pointing outward
+                        norm_len = m.sqrt(sx*sx + sy*sy)
+                        if norm_len > 0.01:
+                            nx, ny = sx / norm_len, sy / norm_len
+                        else:
+                            nx, ny = 0, 0
+
+                        # Transform normal to view space
+                        nvx, nvy, nvz = rotate_to_view(nx, ny, 0)
+
+                        # Camera looks along -Z in view space
+                        # Dot product with camera direction (0, 0, -1) is just -nvz
+                        # But for cylinder normal (radial), we care about Y component
+                        # Use constant alpha - no brightness variation
+                        alpha = 0.8
+                        glColor4f(0.0, 1.0, 1.0, alpha)
                         glVertex3f(sx, sy, sz)
                     glEnd()
 
@@ -745,13 +1001,19 @@ class EarthCanvas(GLCanvas):
         if evt.Dragging() and (evt.LeftIsDown() or evt.RightIsDown()):
             self.x, self.y = evt.GetPosition()
 
+            # Scale rotation speed based on zoom level
+            # When zoomed in (view_distance closer to 0), rotate slower
+            # When zoomed out (view_distance more negative), rotate faster
+            base_distance = -30.0
+            rotation_scale = self.view_distance / base_distance
+
             if evt.RightIsDown():
                 self.z = self.y
-                self.posz += self.z - self.lastz
+                self.posz += (self.z - self.lastz) * rotation_scale
                 self.lastz = self.z
             else:
-                self.posx += self.x - self.lastx
-                self.posy += self.y - self.lasty
+                self.posx += (self.x - self.lastx) * rotation_scale
+                self.posy += (self.y - self.lasty) * rotation_scale
                 self.lastx = self.x
                 self.lasty = self.y
 
