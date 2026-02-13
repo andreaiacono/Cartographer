@@ -6,6 +6,9 @@ import math
 # Add parent directory to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Get project root directory for absolute paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 import earth_canvas_params
 from gui.projections_configs import dynamic_config
 import earth_canvas
@@ -26,7 +29,7 @@ class CartographerFrame(wx.Frame):
         self.rotationx = 0
         self.rotationy = 0
         self.rotationz = 0
-        self.shape = lib.shapefile.Reader("shapes/ne_50m_coastline/ne_50m_coastline.shp").shapes()
+        self.shape = lib.shapefile.Reader(os.path.join(PROJECT_ROOT, "shapes/ne_50m_coastline/ne_50m_coastline.shp")).shapes()
 
         # Menu tracking
         self.id_shapes = {}
@@ -276,7 +279,7 @@ class CartographerFrame(wx.Frame):
     def setShape(self, shape_id):
         """Load a new shapefile and update both panels"""
         shape_name = self.id_shapes[shape_id]
-        self.shape = lib.shapefile.Reader("shapes/" + shape_name + "/" + shape_name + ".shp").shapes()
+        self.shape = lib.shapefile.Reader(os.path.join(PROJECT_ROOT, "shapes", shape_name, shape_name + ".shp")).shapes()
 
         # Update both 2D projection panel and 3D OpenGL panel with the same shapes
         self.projection_panel.setShape(self.shape)

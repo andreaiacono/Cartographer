@@ -1,4 +1,5 @@
 import math
+import os
 import wx
 
 from PIL.Image import *
@@ -8,6 +9,14 @@ from OpenGL.GLUT import *
 from wx import glcanvas
 from wx.glcanvas import GLCanvas
 import lib.shapefile
+
+# Get project root directory for absolute paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Import projection classes to identify specific types
+from projections import gnomonic, stereographic, orthographic, equidistant
+from projections import sinusoidal, mollweide, eckertIV, collignon
+from projections import lambert, albers
 
 
 class EarthCanvas(GLCanvas):
@@ -67,7 +76,7 @@ class EarthCanvas(GLCanvas):
             pass  # Already initialized
 
         # the earth texture
-        image = open("textures/earth_mid.jpg")
+        image = open(os.path.join(PROJECT_ROOT, "textures/earth_mid.jpg"))
         ix = image.size[0]
         iy = image.size[1]
         image = image.tobytes("raw", "RGBX", 0, -1)
@@ -87,7 +96,7 @@ class EarthCanvas(GLCanvas):
         gluQuadricTexture(self.earth_quad, GL_TRUE)
 
         # the texture of the solid enclosing the earth
-        image2 = open("textures/plain_texture.png")
+        image2 = open(os.path.join(PROJECT_ROOT, "textures/plain_texture.png"))
         ix = image2.size[0]
         iy = image2.size[1]
         image2 = image2.tobytes("raw", "RGBX", 0, -1)
@@ -105,6 +114,106 @@ class EarthCanvas(GLCanvas):
         gluQuadricTexture(self.plain_quad, GL_TRUE)
 
         glEnable(GL_DEPTH_TEST)
+
+    def get_azimuthal_ray_type(self):
+        """Determine the ray origin type for the current azimuthal projection.
+        Returns: 'gnomonic', 'stereographic', 'orthographic', 'equidistant', or 'generic'
+        """
+        projection = self.cartographer.projection_panel.projection
+        if isinstance(projection, gnomonic.GnomonicProjection):
+            return 'gnomonic'
+        elif isinstance(projection, stereographic.StereographicProjection):
+            return 'stereographic'
+        elif isinstance(projection, orthographic.AzimuthalOrthographicProjection):
+            return 'orthographic'
+        elif isinstance(projection, equidistant.AzimuthalEquidistantProjection):
+            return 'equidistant'
+        else:
+            return 'generic'
+
+    def get_pseudocylindrical_type(self):
+        """Determine which pseudo-cylindrical projection is active.
+        Returns: 'sinusoidal', 'mollweide', 'eckert4', 'collignon', or 'generic'
+        """
+        projection = self.cartographer.projection_panel.projection
+        if isinstance(projection, sinusoidal.SinusoidalProjection):
+            return 'sinusoidal'
+        elif isinstance(projection, mollweide.MollweideProjection):
+            return 'mollweide'
+        elif isinstance(projection, eckertIV.EckertIVProjection):
+            return 'eckert4'
+        elif isinstance(projection, collignon.CollignonProjection):
+            return 'collignon'
+        else:
+            return 'generic'
+
+    def get_conic_type(self):
+        """Determine which conic projection is active.
+        Returns: 'lambert', 'albers', or 'generic'
+        """
+        projection = self.cartographer.projection_panel.projection
+        if isinstance(projection, lambert.LambertProjection):
+            return 'lambert'
+        elif isinstance(projection, albers.AlbersProjection):
+            return 'albers'
+        else:
+            return 'generic'
+
+    def _compute_pseudocylindrical_surface_point(self, lon_deg, lat_deg):
+        """Compute the 3D position on the projection surface for pseudo-cylindrical projections.
+
+        For pseudo-cylindrical projections, we show the projection as a shaped surface
+        positioned in front of the Earth. The surface shape (ellipse, pointed poles, etc.)
+        is determined by the projection formula.
+
+        Args:
+            lon_deg, lat_deg: Geographic coordinates in degrees
+
+        Returns:
+            (x, y, z) on the projection surface, or None if outside bounds
+        """
+        r = self.earth_radius
+        projection = self.cartographer.projection_panel.projection
+
+        # Get 2D projection coordinates
+        lon_rad = math.radians(lon_deg)
+        lat_rad = math.radians(lat_deg)
+
+        try:
+            x_2d, y_2d = projection.get_coords(lon_rad, lat_rad)
+        except:
+            return None
+
+        # Scale the 2D coordinates to fit nicely around the sphere
+        # The projection formulas return coordinates in their own scale
+        scale_factor = r / 120.0  # Adjust to make it visible and proportional to Earth
+
+        x_proj = x_2d * scale_factor
+        y_proj = y_2d * scale_factor
+
+        # Position the projection surface as a "billboard" in front of the Earth
+        # We'll place it at a fixed distance in front (along the -y axis in our coordinate system)
+        # This shows the projection shape clearly
+
+        # The surface is positioned at y = -(r + offset)
+        # This places it in front of the Earth (since camera typically views from -y direction)
+        offset = r * 0.5
+        z_depth = -(r + offset)
+
+        # Map the 2D projection coordinates to this surface
+        # x_proj → x (horizontal on projection surface)
+        # y_proj → z (vertical on projection surface)
+        # Fixed depth → y (distance from Earth)
+
+        x = x_proj
+        z = y_proj
+        y = z_depth
+
+        # Check bounds - don't draw if too far outside reasonable area
+        if abs(x) > r * 4 or abs(z) > r * 4:
+            return None
+
+        return (x, y, z)
 
     def OnSize(self, event):
         size = self.size = self.GetClientSize()
@@ -151,8 +260,7 @@ class EarthCanvas(GLCanvas):
         # occlude each other
         glDepthMask(GL_FALSE)
 
-        if self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Cylindrical or \
-                        self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.PseudoCylindrical:
+        if self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Cylindrical:
             # Check if it's an Equal Area projection - adjust cylinder height based on standard latitude
             from projections import equal_area
             if isinstance(self.cartographer.projection_panel.projection, equal_area.EqualAreaProjection):
@@ -185,19 +293,87 @@ class EarthCanvas(GLCanvas):
             if self.draw_rays:
                 self.draw_shape_rays()
             glDisable(GL_BLEND)
+        elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.PseudoCylindrical:
+            # Draw shaped projection surface for pseudo-cylindrical projections
+            # The surface shape reveals the projection's characteristic (ellipse, pointed, etc.)
+            self.draw_pseudocylindrical_surface()
+            if self.draw_rays:
+                self.draw_shape_rays()
+            glDisable(GL_BLEND)
         elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Conic:
+            # Draw cone for conic projections
+            r = self.earth_radius
+            base_r = r * self.standard_parallel1 / 10.0
+            h = r * 3.0
+
             glPushMatrix()
-            glTranslatef(0.0, 0.0, -self.earth_radius)
+            glTranslatef(0.0, 0.0, -r)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
             glColor4f(1.0, 1.0, 1.0, 0.5)
             glBindTexture(GL_TEXTURE_2D, self.plain_texture)
-            gluCylinder(self.plain_quad, self.earth_radius * self.standard_parallel1 / 10, 0, self.earth_radius * 3, 32, 64)
+            gluCylinder(self.plain_quad, base_r, 0, h, 32, 64)
+
+            # Draw standard parallels circles on the cone surface
+            glDisable(GL_TEXTURE_2D)
+            glLineWidth(2.0)
+            glColor4f(1.0, 0.8, 0.2, 0.9)  # Orange/yellow for standard parallels
+
+            # Calculate z positions and radii for standard parallels
+            # Cone equation: radius = base_r * (1 - z/h)
+            projection = self.cartographer.projection_panel.projection
+            if hasattr(projection, 'phi1') and hasattr(projection, 'phi2'):
+                phi1 = math.degrees(projection.phi1)
+                phi2 = math.degrees(projection.phi2)
+
+                # Map latitudes to z-positions on cone (approximation)
+                # Assuming equator is at z=h/2, poles at z=0 and z=h
+                z1 = h * (0.5 - phi1 / 180.0)
+                z2 = h * (0.5 - phi2 / 180.0)
+
+                # Calculate radii at these z-positions
+                if 0 <= z1 <= h:
+                    r1 = base_r * (1 - z1 / h)
+                    if r1 > 0:
+                        glBegin(GL_LINE_LOOP)
+                        for i in range(64):
+                            theta = 2.0 * math.pi * i / 64
+                            x = r1 * math.cos(theta)
+                            y = r1 * math.sin(theta)
+                            glVertex3f(x, y, z1)
+                        glEnd()
+
+                if 0 <= z2 <= h:
+                    r2 = base_r * (1 - z2 / h)
+                    if r2 > 0:
+                        glBegin(GL_LINE_LOOP)
+                        for i in range(64):
+                            theta = 2.0 * math.pi * i / 64
+                            x = r2 * math.cos(theta)
+                            y = r2 * math.sin(theta)
+                            glVertex3f(x, y, z2)
+                        glEnd()
+
+            # Draw apex point marker
+            glColor4f(1.0, 1.0, 0.0, 1.0)
+            glPointSize(8.0)
+            glBegin(GL_POINTS)
+            glVertex3f(0, 0, h)
+            glEnd()
+            glPointSize(1.0)
+
+            glEnable(GL_TEXTURE_2D)
+            glLineWidth(1.0)
             glPopMatrix()
+
+            # Draw label
+            self.draw_conic_label()
+
             if self.draw_rays:
                 self.draw_shape_rays()
             glDisable(GL_BLEND)
         elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Azimuthal:
+            # Draw tangent plane for azimuthal projections
             glPushMatrix()
             disk_size = 3
             glTranslatef(0.0, 0.0, -self.earth_radius)
@@ -206,7 +382,66 @@ class EarthCanvas(GLCanvas):
             glColor4f(1.0, 1.0, 1.0, 0.5)
             glBindTexture(GL_TEXTURE_2D, self.plain_texture)
             gluDisk(self.plain_quad, 0, self.earth_radius * disk_size, 32, 64)
+
+            # Draw center point marker
             self.draw_circle(0, 0.01, 6)
+
+            # Draw distance rings for azimuthal equidistant
+            ray_type = self.get_azimuthal_ray_type()
+            if ray_type == 'equidistant':
+                glDisable(GL_TEXTURE_2D)
+                glColor4f(0.8, 0.8, 1.0, 0.3)  # Light blue for distance rings
+                glLineWidth(1.0)
+                # Draw rings at 30°, 60°, 90°, 120°, 150° intervals
+                for angle_deg in [30, 60, 90, 120, 150]:
+                    angle_rad = math.radians(angle_deg)
+                    # For azimuthal equidistant, distance on map = R * angular distance
+                    ring_radius = self.earth_radius * angle_rad
+                    glBegin(GL_LINE_LOOP)
+                    for i in range(64):
+                        theta = 2.0 * math.pi * i / 64
+                        x = ring_radius * math.cos(theta)
+                        y = ring_radius * math.sin(theta)
+                        glVertex3f(x, y, 0)
+                    glEnd()
+                glEnable(GL_TEXTURE_2D)
+
+            # Draw label showing projection type and ray origin
+            glDisable(GL_TEXTURE_2D)
+            glDisable(GL_BLEND)
+            glColor3f(1.0, 1.0, 1.0)
+
+            # Position label at edge of projection plane
+            label_x = self.earth_radius * 2.5
+            label_y = 0
+            label_z = 0
+
+            glPushMatrix()
+            glTranslatef(label_x, label_y, label_z)
+            glRotatef(90, 1, 0, 0)  # Rotate to be readable
+            glScalef(0.003, 0.003, 0.003)
+
+            ray_type = self.get_azimuthal_ray_type()
+            if ray_type == 'gnomonic':
+                label_text = b"Gnomonic (rays from center)"
+            elif ray_type == 'stereographic':
+                label_text = b"Stereographic (rays from opposite point)"
+            elif ray_type == 'orthographic':
+                label_text = b"Orthographic (parallel rays)"
+            elif ray_type == 'equidistant':
+                label_text = b"Azimuthal Equidistant"
+            else:
+                label_text = b"Azimuthal"
+
+            try:
+                glutStrokeString(GLUT_STROKE_ROMAN, label_text)
+            except:
+                pass  # GLUT not available
+
+            glPopMatrix()
+            glEnable(GL_TEXTURE_2D)
+            glEnable(GL_BLEND)
+
             glPopMatrix()
             if self.draw_rays:
                 self.draw_shape_rays()
@@ -422,6 +657,59 @@ class EarthCanvas(GLCanvas):
 
         # Re-enable textures
         glEnable(GL_TEXTURE_2D)
+
+    def _compute_azimuthal_intersection(self, px, py, pz):
+        """Compute intersection with azimuthal plane using projection-specific ray origin.
+        px, py, pz: point on sphere surface
+        Returns (ix, iy, iz) on tangent plane or None
+        """
+        r = self.earth_radius
+        ray_type = self.get_azimuthal_ray_type()
+        plane_z = -r  # Tangent plane at south pole
+
+        if ray_type == 'gnomonic':
+            # Rays from center (0, 0, 0)
+            if abs(pz) < 1e-9:
+                return None
+            t = plane_z / pz
+            if t < 0:  # Ray goes wrong direction
+                return None
+            ix, iy = px * t, py * t
+
+        elif ray_type == 'stereographic':
+            # Rays from opposite point (north pole at 0, 0, r)
+            origin_z = r
+            dx, dy, dz = px, py, pz - origin_z
+            if abs(dz) < 1e-9:
+                return None
+            t = (plane_z - origin_z) / dz
+            if t < 0:
+                return None
+            ix = dx * t
+            iy = dy * t
+
+        elif ray_type == 'orthographic':
+            # Parallel rays from infinity, perpendicular to plane
+            # Simply project straight down onto the plane
+            ix, iy = px, py
+            # Check if point is on visible hemisphere
+            if pz > 0:  # Back side, not visible
+                return None
+
+        else:  # 'equidistant' or 'generic'
+            # Use rays from center (generic geometric)
+            if abs(pz) < 1e-9:
+                return None
+            t = plane_z / pz
+            if t < 0:
+                return None
+            ix, iy = px * t, py * t
+
+        # Check if within plane bounds
+        if ix * ix + iy * iy > (r * 3) ** 2:
+            return None
+
+        return (ix, iy, plane_z)
 
     def _intersect_ray(self, dx, dy, dz, proj_type, ProjectionType):
         """Compute intersection of a ray from origin with the projection surface.
@@ -811,7 +1099,7 @@ class EarthCanvas(GLCanvas):
                     lon_deg, lat_deg = p[0], p[1]
                     px, py, pz = sphere_point(lon_deg, lat_deg)
 
-                    # Calculate cylinder intersection point
+                    # Calculate projection surface intersection point
                     if is_mercator or is_equal_area:
                         # Calculate effective lat/lon with respect to the FIXED vertical cylinder
                         # After Earth rotation, we need the coordinates in world space
@@ -843,9 +1131,23 @@ class EarthCanvas(GLCanvas):
                                 part_hits.append(hit)
                         else:
                             hit = None
+                    elif proj_type == ProjectionType.PseudoCylindrical:
+                        # Pseudo-cylindrical projections use mathematical formulas
+                        # Show them as deformed surfaces based on the projection formula
+                        hit = self._compute_pseudocylindrical_surface_point(lon_deg, lat_deg)
+
+                        if hit is not None:
+                            all_intersections.append(hit)
+                            all_sphere_points.append((px, py, pz))
+                            all_latlon.append((lon_deg, lat_deg))
+                            part_hits.append(hit)
                     else:
                         # Use geometric projection for other types
-                        hit = ray_intersect(px, py, pz)
+                        # Special handling for azimuthal projections with different ray origins
+                        if proj_type == ProjectionType.Azimuthal:
+                            hit = self._compute_azimuthal_intersection(px, py, pz)
+                        else:
+                            hit = ray_intersect(px, py, pz)
 
                         if hit is not None:
                             all_intersections.append(hit)
@@ -891,12 +1193,49 @@ class EarthCanvas(GLCanvas):
                     for px, py, pz in ray_points:
                         glVertex3f(px, py, pz)
                     glEnd()
-                else:
-                    # Draw straight ray from center for other projections (geometric projection)
-                    glBegin(GL_LINES)
-                    glVertex3f(0, 0, 0)
-                    glVertex3f(ix, iy, iz)
+                elif proj_type == ProjectionType.PseudoCylindrical:
+                    # Draw curved ray from sphere surface to projection surface
+                    # showing the mathematical transformation
+                    sphere_pt = all_sphere_points[i]
+                    # Draw smooth curve from sphere surface to projection point
+                    glBegin(GL_LINE_STRIP)
+                    steps = 15
+                    for step in range(steps + 1):
+                        t = step / float(steps)
+                        # Smoothstep easing for nice curve
+                        smooth_t = t * t * (3 - 2 * t)
+                        # Interpolate from sphere surface to projection surface
+                        px = sphere_pt[0] * (1 - smooth_t) + ix * smooth_t
+                        py = sphere_pt[1] * (1 - smooth_t) + iy * smooth_t
+                        pz = sphere_pt[2] * (1 - smooth_t) + iz * smooth_t
+                        glVertex3f(px, py, pz)
                     glEnd()
+                else:
+                    # Draw rays for other projections
+                    if proj_type == ProjectionType.Azimuthal:
+                        # Different ray origins for different azimuthal projections
+                        ray_type = self.get_azimuthal_ray_type()
+                        glBegin(GL_LINES)
+
+                        if ray_type == 'stereographic':
+                            # Ray from opposite point (north pole)
+                            glVertex3f(0, 0, r)
+                        elif ray_type == 'orthographic':
+                            # Parallel ray from "infinity" - show as starting above the projection
+                            # Start from a point directly above the final position
+                            glVertex3f(ix, iy, iz + 3 * r)
+                        else:  # gnomonic, equidistant, generic
+                            # Ray from center
+                            glVertex3f(0, 0, 0)
+
+                        glVertex3f(ix, iy, iz)
+                        glEnd()
+                    else:
+                        # Draw straight ray from center for conic and other projections
+                        glBegin(GL_LINES)
+                        glVertex3f(0, 0, 0)
+                        glVertex3f(ix, iy, iz)
+                        glEnd()
 
         # Draw continent outlines on projection surface
         # Vary alpha based on facing toward light/camera
@@ -1022,6 +1361,154 @@ class EarthCanvas(GLCanvas):
     def set_standard_parallels(self, value1, value2):
         self.standard_parallel1 = value1
         self.standard_parallel2 = value2
+
+    def draw_pseudocylindrical_surface(self):
+        """Draw the characteristic surface shape for pseudo-cylindrical projections.
+
+        Creates a mesh showing the projection's shape (ellipse, pointed poles, etc.)
+        positioned in front of the Earth.
+        """
+        r = self.earth_radius
+        projection = self.cartographer.projection_panel.projection
+        proj_type = self.get_pseudocylindrical_type()
+
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE)
+        glColor4f(0.7, 0.9, 1.0, 0.2)  # Light blue, semi-transparent
+        glDisable(GL_TEXTURE_2D)
+
+        # Draw a mesh grid showing the projection surface
+        # Sample latitudes and longitudes to create the mesh
+        lat_steps = 20
+        lon_steps = 36
+
+        glBegin(GL_LINES)
+
+        # Draw meridians (longitude lines)
+        for i_lon in range(lon_steps):
+            lon_deg = -180 + i_lon * 360.0 / lon_steps
+            prev_pt = None
+            for i_lat in range(lat_steps + 1):
+                lat_deg = -90 + i_lat * 180.0 / lat_steps
+                pt = self._compute_pseudocylindrical_surface_point(lon_deg, lat_deg)
+                if pt is not None and prev_pt is not None:
+                    glVertex3f(prev_pt[0], prev_pt[1], prev_pt[2])
+                    glVertex3f(pt[0], pt[1], pt[2])
+                prev_pt = pt
+
+        # Draw parallels (latitude lines)
+        for i_lat in range(lat_steps + 1):
+            lat_deg = -90 + i_lat * 180.0 / lat_steps
+            prev_pt = None
+            for i_lon in range(lon_steps + 1):
+                lon_deg = -180 + i_lon * 360.0 / lon_steps
+                pt = self._compute_pseudocylindrical_surface_point(lon_deg, lat_deg)
+                if pt is not None and prev_pt is not None:
+                    glVertex3f(prev_pt[0], prev_pt[1], prev_pt[2])
+                    glVertex3f(pt[0], pt[1], pt[2])
+                prev_pt = pt
+
+        glEnd()
+
+        # Draw outline showing characteristic shape
+        glColor4f(1.0, 1.0, 1.0, 0.6)
+        glLineWidth(2.0)
+        glBegin(GL_LINE_LOOP)
+        # Draw the equator outline (characteristic shape)
+        for i in range(lon_steps):
+            lon_deg = -180 + i * 360.0 / lon_steps
+            pt = self._compute_pseudocylindrical_surface_point(lon_deg, 0)  # Equator
+            if pt is not None:
+                glVertex3f(pt[0], pt[1], pt[2])
+        glEnd()
+
+        # Draw label showing projection type
+        glColor3f(1.0, 1.0, 1.0)
+        label_offset = r * 0.3
+        glPushMatrix()
+        # Position label next to the surface
+        glTranslatef(r * 2.5, -(r + r * 0.5), r * 2)
+        glRotatef(90, 1, 0, 0)
+        glScalef(0.003, 0.003, 0.003)
+
+        if proj_type == 'sinusoidal':
+            label_text = b"Sinusoidal (pointed poles)"
+        elif proj_type == 'mollweide':
+            label_text = b"Mollweide (elliptical)"
+        elif proj_type == 'eckert4':
+            label_text = b"Eckert IV (compromise)"
+        elif proj_type == 'collignon':
+            label_text = b"Collignon (diamond shape)"
+        else:
+            label_text = b"Pseudo-cylindrical"
+
+        try:
+            glutStrokeString(GLUT_STROKE_ROMAN, label_text)
+        except:
+            pass  # GLUT not available
+
+        glPopMatrix()
+
+        glEnable(GL_TEXTURE_2D)
+        glLineWidth(1.0)
+
+    def set_standard_parallels(self, phi1, phi2):
+        """Set standard parallels for conic projections.
+
+        Args:
+            phi1, phi2: Standard parallel values in degrees
+        """
+        self.standard_parallel1 = phi1 / 10.0
+        self.standard_parallel2 = phi2 / 10.0
+
+    def draw_conic_label(self):
+        """Draw label for conic projections showing projection type and standard parallels."""
+        r = self.earth_radius
+        conic_type = self.get_conic_type()
+        projection = self.cartographer.projection_panel.projection
+
+        glDisable(GL_TEXTURE_2D)
+        glDisable(GL_BLEND)
+        glColor3f(1.0, 1.0, 1.0)
+
+        # Position label to the side of the cone
+        label_x = r * 2.5
+        label_y = 0
+        label_z = r * 1.5
+
+        glPushMatrix()
+        glTranslatef(label_x, label_y, label_z)
+        glRotatef(90, 1, 0, 0)
+        glScalef(0.003, 0.003, 0.003)
+
+        # Get standard parallels for label
+        if hasattr(projection, 'phi1') and hasattr(projection, 'phi2'):
+            phi1_deg = int(math.degrees(projection.phi1))
+            phi2_deg = int(math.degrees(projection.phi2))
+
+            if conic_type == 'lambert':
+                label_text = f"Lambert Conformal Conic\nStd Parallels: {phi1_deg}°, {phi2_deg}°".encode()
+            elif conic_type == 'albers':
+                label_text = f"Albers Equal Area Conic\nStd Parallels: {phi1_deg}°, {phi2_deg}°".encode()
+            else:
+                label_text = f"Conic Projection\nStd Parallels: {phi1_deg}°, {phi2_deg}°".encode()
+        else:
+            label_text = b"Conic Projection"
+
+        try:
+            # Split multi-line text
+            lines = label_text.split(b'\n')
+            for i, line in enumerate(lines):
+                glPushMatrix()
+                glTranslatef(0, -i * 150, 0)  # Move down for each line
+                glutStrokeString(GLUT_STROKE_ROMAN, line)
+                glPopMatrix()
+        except:
+            pass  # GLUT not available
+
+        glPopMatrix()
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
 
     def draw_circle(self, y, radius, smoothness):
         mp = 2 * math.pi / smoothness

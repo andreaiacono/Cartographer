@@ -1,6 +1,6 @@
 import wx
 import math
-from projections import equal_area, mercator, miller
+from projections import equal_area, mercator, miller, lambert, albers
 
 
 class DynamicParamsPanel(wx.Panel):
@@ -25,11 +25,13 @@ class DynamicParamsPanel(wx.Panel):
 
         # Create all control groups (hidden initially)
         self._create_equal_area_controls()
+        self._create_conic_controls()
         self._create_empty_controls()
 
         # Start with empty controls visible
         self.projection_controls_sizer.Add(self.empty_sizer, flag=wx.EXPAND)
         self.equal_area_sizer.ShowItems(False)
+        self.conic_sizer.ShowItems(False)
         self.empty_sizer.ShowItems(True)
 
         # Separator (always visible)
@@ -85,6 +87,52 @@ class DynamicParamsPanel(wx.Panel):
         self.equal_area_sizer.AddGrowableCol(1)
 
         # Don't add to main sizer yet - we'll manage visibility dynamically
+
+    def _create_conic_controls(self):
+        """Create conic projection controls (two standard parallel sliders)"""
+        self.conic_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Title
+        title = wx.StaticText(self, label="\nStandard Parallels Configuration")
+        font = title.GetFont()
+        font.SetWeight(wx.FONTWEIGHT_BOLD)
+        title.SetFont(font)
+        self.conic_sizer.Add(title, flag=wx.TOP | wx.LEFT | wx.BOTTOM, border=5)
+
+        # Slider 1 (First Standard Parallel)
+        self.label_phi1 = wx.StaticText(self, label="First Standard Parallel: 30°")
+        self.conic_sizer.Add(self.label_phi1, flag=wx.LEFT | wx.TOP, border=5)
+
+        self.slider_phi1 = wx.Slider(
+            self, minValue=0, maxValue=88,
+            value=30,
+            style=wx.SL_HORIZONTAL
+        )
+        self.conic_sizer.Add(self.slider_phi1, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=5)
+
+        # Slider 2 (Second Standard Parallel)
+        self.label_phi2 = wx.StaticText(self, label="Second Standard Parallel: 60°")
+        self.conic_sizer.Add(self.label_phi2, flag=wx.LEFT | wx.TOP, border=5)
+
+        self.slider_phi2 = wx.Slider(
+            self, minValue=1, maxValue=89,
+            value=60,
+            style=wx.SL_HORIZONTAL
+        )
+        self.conic_sizer.Add(self.slider_phi2, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=5)
+
+        # Info text
+        info = wx.StaticText(self, label="Tip: First parallel < Second parallel")
+        info.SetForegroundColour(wx.Colour(100, 100, 100))
+        self.conic_sizer.Add(info, flag=wx.LEFT | wx.BOTTOM, border=5)
+
+        # Store IDs for event handling
+        self.phi1_id = self.slider_phi1.GetId()
+        self.phi2_id = self.slider_phi2.GetId()
+
+        # Bind slider events
+        self.Bind(wx.EVT_SLIDER, self._on_conic_slider_change, self.slider_phi1)
+        self.Bind(wx.EVT_SLIDER, self._on_conic_slider_change, self.slider_phi2)
 
     def _create_empty_controls(self):
         """Create empty controls for projections without specific parameters"""
@@ -164,6 +212,44 @@ class DynamicParamsPanel(wx.Panel):
             self.cartographer.projection_panel.OnDraw()
             wx.CallAfter(self.cartographer.projection_panel.Refresh)
 
+    def _on_conic_slider_change(self, event):
+        """Handle conic projection standard parallel slider changes."""
+        # Ensure phi1 < phi2
+        if event.GetEventObject().GetId() == self.phi1_id:
+            if self.slider_phi1.GetValue() >= self.slider_phi2.GetValue():
+                self.slider_phi2.SetValue(self.slider_phi1.GetValue() + 1)
+        elif event.GetEventObject().GetId() == self.phi2_id:
+            if self.slider_phi2.GetValue() <= self.slider_phi1.GetValue():
+                self.slider_phi1.SetValue(self.slider_phi2.GetValue() - 1)
+
+        phi1_val = self.slider_phi1.GetValue()
+        phi2_val = self.slider_phi2.GetValue()
+
+        # Update labels
+        self.label_phi1.SetLabel(f"First Standard Parallel: {phi1_val}°")
+        self.label_phi2.SetLabel(f"Second Standard Parallel: {phi2_val}°")
+
+        # Update projection
+        if self.cartographer and hasattr(self.cartographer, 'projection_panel'):
+            projection = self.cartographer.projection_panel.projection
+            if isinstance(projection, (lambert.LambertProjection, albers.AlbersProjection)):
+                # Lambert expects radians, Albers might too
+                if isinstance(projection, lambert.LambertProjection):
+                    projection.set_standard_parallels(phi1_val, phi2_val)
+                else:  # Albers
+                    projection.set_standard_parallels(math.radians(phi1_val), math.radians(phi2_val))
+
+                # Update earth canvas standard parallels (for visualization)
+                if hasattr(self.cartographer, 'earth_canvas'):
+                    self.cartographer.earth_canvas.standard_parallel1 = phi1_val / 10.0  # Scale for visualization
+                    self.cartographer.earth_canvas.standard_parallel2 = phi2_val / 10.0
+
+                # Refresh both panels
+                wx.CallAfter(self.cartographer.projection_panel.Refresh)
+                wx.CallAfter(self.cartographer.earth_canvas.Refresh)
+
+        self.Layout()
+
     def set_projection(self, projection_obj):
         """
         Update the panel to show controls appropriate for the given projection.
@@ -172,13 +258,17 @@ class DynamicParamsPanel(wx.Panel):
             projection_obj: Instance of a projection class (EqualAreaProjection,
                           MercatorProjection, MillerProjection, etc.)
         """
+        # Hide all control groups first
+        self.projection_controls_sizer.Detach(self.empty_sizer)
+        self.projection_controls_sizer.Detach(self.equal_area_sizer)
+        self.projection_controls_sizer.Detach(self.conic_sizer)
+        self.empty_sizer.ShowItems(False)
+        self.equal_area_sizer.ShowItems(False)
+        self.conic_sizer.ShowItems(False)
+
         # Detect projection type and show appropriate controls
         if isinstance(projection_obj, equal_area.EqualAreaProjection):
             # Show Equal Area controls
-            self.projection_controls_sizer.Detach(self.empty_sizer)
-            self.projection_controls_sizer.Detach(self.equal_area_sizer)
-            self.empty_sizer.ShowItems(False)
-
             self.projection_controls_sizer.Add(self.equal_area_sizer, flag=wx.EXPAND | wx.ALL, border=5)
             self.equal_area_sizer.ShowItems(True)
 
@@ -196,12 +286,25 @@ class DynamicParamsPanel(wx.Panel):
             # Set larger minimum height for Equal Area (needs space for slider + 6 radio buttons)
             required_height = 250
 
-        else:
-            # Show empty controls (Mercator, Miller, or other cylindrical projections)
-            self.projection_controls_sizer.Detach(self.equal_area_sizer)
-            self.projection_controls_sizer.Detach(self.empty_sizer)
-            self.equal_area_sizer.ShowItems(False)
+        elif isinstance(projection_obj, (lambert.LambertProjection, albers.AlbersProjection)):
+            # Show Conic controls
+            self.projection_controls_sizer.Add(self.conic_sizer, flag=wx.EXPAND | wx.ALL, border=5)
+            self.conic_sizer.ShowItems(True)
 
+            # Initialize with current projection's standard parallels if available
+            if hasattr(projection_obj, 'phi1') and hasattr(projection_obj, 'phi2'):
+                phi1_degrees = math.degrees(projection_obj.phi1)
+                phi2_degrees = math.degrees(projection_obj.phi2)
+                self.slider_phi1.SetValue(int(phi1_degrees))
+                self.slider_phi2.SetValue(int(phi2_degrees))
+                self.label_phi1.SetLabel(f"First Standard Parallel: {int(phi1_degrees)}°")
+                self.label_phi2.SetLabel(f"Second Standard Parallel: {int(phi2_degrees)}°")
+
+            # Set medium height for Conic controls
+            required_height = 220
+
+        else:
+            # Show empty controls (Mercator, Miller, or other projections)
             self.projection_controls_sizer.Add(self.empty_sizer, flag=wx.EXPAND | wx.ALL, border=5)
             self.empty_sizer.ShowItems(True)
 
