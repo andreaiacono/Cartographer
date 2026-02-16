@@ -574,7 +574,7 @@ class EarthCanvas(GLCanvas):
         glDisable(GL_LIGHTING)
 
         # Draw 8 short vertical lines evenly spaced around the cylinder
-        glColor4f(0.7, 0.7, 0.7, 0.4)  # Gray with less opacity
+        glColor4f(0.7, 0.7, 0.7, 0.4)  # Gray with constant opacity
         glLineWidth(2.0)
 
         line_length = 0.3  # Length of the short lines
@@ -601,7 +601,7 @@ class EarthCanvas(GLCanvas):
 
         # Draw longitude labels (0, 90, 180, 270) as if printed on cylinder surface
         # Using the coordinate system: x = r*sin(lon), y = -r*cos(lon)
-        glColor4f(0.3, 0.3, 0.3, 0.9)  # Dark gray for better contrast
+        glColor4f(0.3, 0.3, 0.3, 0.9)  # Dark gray with constant opacity
         glLineWidth(2.0)
 
         # Longitude positions: rotate by 270° from standard to put 0° at front
@@ -1238,34 +1238,10 @@ class EarthCanvas(GLCanvas):
                         glEnd()
 
         # Draw continent outlines on projection surface
-        # Vary alpha based on facing toward light/camera
-        # Account for both view rotation (posx/y/z) to simulate fixed light source
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glLineWidth(2.0)
 
-        # Precompute view rotation matrix (posy=X, posx=Z, posz=Y)
         import math as m
-        _cos, _sin, _rad = m.cos, m.sin, m.radians
-
-        cy, sy = _cos(_rad(self.posy)), _sin(_rad(self.posy))  # X rotation
-        cx, sx = _cos(_rad(self.posx)), _sin(_rad(self.posx))  # Z rotation
-        cz, sz = _cos(_rad(self.posz)), _sin(_rad(self.posz))  # Y rotation
-
-        # Apply view rotations in order: Y (posy), Z (posx), Y (posz)
-        def rotate_to_view(x, y, z):
-            # Apply posy (X rotation)
-            x1 = x
-            y1 = cy * y - sy * z
-            z1 = sy * y + cy * z
-            # Apply posx (Z rotation)
-            x2 = cx * x1 - sx * y1
-            y2 = sx * x1 + cx * y1
-            z2 = z1
-            # Apply posz (Y rotation)
-            x3 = cz * x2 + sz * z2
-            y3 = y2
-            z3 = -sz * x2 + cz * z2
-            return x3, y3, z3
 
         cyl_radius = r * 1.01
 
@@ -1291,24 +1267,8 @@ class EarthCanvas(GLCanvas):
                     part_hits[j], part_hits[j + 1], proj_type, ProjectionType)
                 if len(seg) >= 2:
                     glBegin(GL_LINE_STRIP)
+                    glColor4f(0.0, 1.0, 1.0, 0.8)  # Constant alpha - no brightness variation
                     for sx, sy, sz in seg:
-                        # Calculate surface normal for cylinder (radial direction)
-                        # Normal is perpendicular to Z axis, pointing outward
-                        norm_len = m.sqrt(sx*sx + sy*sy)
-                        if norm_len > 0.01:
-                            nx, ny = sx / norm_len, sy / norm_len
-                        else:
-                            nx, ny = 0, 0
-
-                        # Transform normal to view space
-                        nvx, nvy, nvz = rotate_to_view(nx, ny, 0)
-
-                        # Camera looks along -Z in view space
-                        # Dot product with camera direction (0, 0, -1) is just -nvz
-                        # But for cylinder normal (radial), we care about Y component
-                        # Use constant alpha - no brightness variation
-                        alpha = 0.8
-                        glColor4f(0.0, 1.0, 1.0, alpha)
                         glVertex3f(sx, sy, sz)
                     glEnd()
 
