@@ -413,11 +413,13 @@ class ProjectionPanel(wx.Panel):
         self.Refresh()  # Trigger repaint
 
     def OnPaint(self, event):
+        self.render(wx.PaintDC(self))
+
+    # draws the whole projection onto the given dc; shared by OnPaint and by
+    # the image export, so both always produce the same picture
+    def render(self, dc):
         # Cache rotation matrix once per frame
         self._cache_rotation_matrix()
-
-        # Create paint DC
-        dc = wx.PaintDC(self)
 
         # Clear background
         dc.SetBackground(wx.Brush("white"))
@@ -473,77 +475,88 @@ class ProjectionPanel(wx.Panel):
 
                 # Track multiple line segments (break on discontinuities)
                 lines = []
-                current_line = []
-                prev_x = None
-                prev_y = None
 
-                for i in range(0, len(points), step):
-                    lon, lat = points[i]
+                # Respect the shape's parts: each part is a separate ring (a
+                # country's mainland, then each of its islands). Drawing straight
+                # through them joins the end of one part to the start of the next
+                # with a line clear across the map.
+                parts = list(shape.parts) if getattr(shape, 'parts', None) else [0]
 
-                    # Apply rotation and Mercator projection
-                    try:
-                        # Convert to radians
-                        lon_rad = math.radians(-lon)  # Negate for proper orientation
-                        lat_rad = math.radians(lat)
+                for pi in range(len(parts)):
+                    p_start = parts[pi]
+                    p_end = parts[pi + 1] if pi + 1 < len(parts) else len(points)
 
-                        # Convert lat/lon to 3D Cartesian (unit sphere, radius = 1)
-                        cos_lat = math.cos(lat_rad)
-                        sx = cos_lat * math.cos(lon_rad)
-                        sy = cos_lat * math.sin(lon_rad)
-                        sz = math.sin(lat_rad)
+                    current_line = []
+                    prev_x = None
+                    prev_y = None
 
-                        # Apply rotation matrix (cached from _cache_rotation_matrix)
-                        px = self._rot_a * sx + self._rot_b * sy + self._rot_c * sz
-                        py = self._rot_d * sx + self._rot_e * sy + self._rot_f * sz
-                        pz = self._rot_g * sx + self._rot_h * sy + self._rot_i * sz
+                    for i in range(p_start, p_end, step):
+                        lon, lat = points[i]
 
-                        # Convert back to effective lat/lon after rotation
-                        # px, py, pz are already normalized coordinates on unit sphere (range -1 to 1)
-                        lat_eff = math.asin(pz)  # NO math.radians - pz is already normalized!
-                        lon_eff = math.atan2(py, px)  # Standard spherical coordinates
+                        # Apply rotation and Mercator projection
+                        try:
+                            # Convert to radians
+                            lon_rad = math.radians(-lon)  # Negate for proper orientation
+                            lat_rad = math.radians(lat)
 
-                        # Get projected coordinates using effective lat/lon
-                        proj_x, proj_y = self.projection.get_coords(lon_eff, lat_eff)
+                            # Convert lat/lon to 3D Cartesian (unit sphere, radius = 1)
+                            cos_lat = math.cos(lat_rad)
+                            sx = cos_lat * math.cos(lon_rad)
+                            sy = cos_lat * math.sin(lon_rad)
+                            sz = math.sin(lat_rad)
 
-                        # Transform to screen coordinates
-                        # Negate proj_x for correct east-west orientation
-                        # Negate proj_y because screen y increases downward
-                        x = int(-proj_x * self.mf + self.tx)
-                        y = int(-proj_y * self.mf + self.ty)
+                            # Apply rotation matrix (cached from _cache_rotation_matrix)
+                            px = self._rot_a * sx + self._rot_b * sy + self._rot_c * sz
+                            py = self._rot_d * sx + self._rot_e * sy + self._rot_f * sz
+                            pz = self._rot_g * sx + self._rot_h * sy + self._rot_i * sz
 
-                        # Check for large jumps (edge wrapping/discontinuity)
-                        if prev_x is not None:
-                            dx = x - prev_x
-                            dy = y - prev_y
-                            # Use Euclidean distance for more accurate discontinuity detection
-                            distance = math.sqrt(dx*dx + dy*dy)
-                            if distance < threshold:
-                                # Points are close, continue current line
-                                current_line.append((x, y))
+                            # Convert back to effective lat/lon after rotation
+                            # px, py, pz are already normalized coordinates on unit sphere (range -1 to 1)
+                            lat_eff = math.asin(pz)  # NO math.radians - pz is already normalized!
+                            lon_eff = math.atan2(py, px)  # Standard spherical coordinates
+
+                            # Get projected coordinates using effective lat/lon
+                            proj_x, proj_y = self.projection.get_coords(lon_eff, lat_eff)
+
+                            # Transform to screen coordinates
+                            # Negate proj_x for correct east-west orientation
+                            # Negate proj_y because screen y increases downward
+                            x = int(-proj_x * self.mf + self.tx)
+                            y = int(-proj_y * self.mf + self.ty)
+
+                            # Check for large jumps (edge wrapping/discontinuity)
+                            if prev_x is not None:
+                                dx = x - prev_x
+                                dy = y - prev_y
+                                # Use Euclidean distance for more accurate discontinuity detection
+                                distance = math.sqrt(dx*dx + dy*dy)
+                                if distance < threshold:
+                                    # Points are close, continue current line
+                                    current_line.append((x, y))
+                                else:
+                                    # Large jump detected, start new line segment
+                                    if len(current_line) > 1:
+                                        lines.append(current_line)
+                                    current_line = [(x, y)]
                             else:
-                                # Large jump detected, start new line segment
-                                if len(current_line) > 1:
-                                    lines.append(current_line)
-                                current_line = [(x, y)]
-                        else:
-                            # First point
-                            current_line.append((x, y))
+                                # First point
+                                current_line.append((x, y))
 
-                        prev_x = x
-                        prev_y = y
+                            prev_x = x
+                            prev_y = y
 
-                    except:
-                        # Skip points that can't be projected
-                        # Start new line segment after error
-                        if len(current_line) > 1:
-                            lines.append(current_line)
-                        current_line = []
-                        prev_x = None
-                        prev_y = None
+                        except:
+                            # Skip points that can't be projected
+                            # Start new line segment after error
+                            if len(current_line) > 1:
+                                lines.append(current_line)
+                            current_line = []
+                            prev_x = None
+                            prev_y = None
 
-                # Add final line segment
-                if len(current_line) > 1:
-                    lines.append(current_line)
+                    # Add final line segment of this part
+                    if len(current_line) > 1:
+                        lines.append(current_line)
 
                 # Draw all line segments
                 for line in lines:

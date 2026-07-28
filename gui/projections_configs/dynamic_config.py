@@ -241,8 +241,7 @@ class DynamicParamsPanel(wx.Panel):
 
                 # Update earth canvas standard parallels (for visualization)
                 if hasattr(self.cartographer, 'earth_canvas'):
-                    self.cartographer.earth_canvas.standard_parallel1 = phi1_val / 10.0  # Scale for visualization
-                    self.cartographer.earth_canvas.standard_parallel2 = phi2_val / 10.0
+                    self.cartographer.earth_canvas.set_standard_parallels(phi1_val, phi2_val)
 
                 # Refresh both panels
                 wx.CallAfter(self.cartographer.projection_panel.Refresh)

@@ -1,0 +1,5 @@
+wxPython>=4.2
+PyOpenGL>=3.1
+PyOpenGL-accelerate>=3.1
+mpmath>=1.0
+Pillow>=8.0

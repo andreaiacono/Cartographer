@@ -1,21 +1,22 @@
 # Set the base image to Ubuntu
-FROM ubuntu
+FROM ubuntu:24.04
 
-# File Author / Maintainer
-MAINTAINER Andrea Iacono
+LABEL maintainer="Andrea Iacono"
 
-# Update the sources list
+# Keep apt from stopping on tzdata-style prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update
 
 # Install basic applications
 RUN apt-get install -y tar git curl nano wget dialog net-tools build-essential
 
-# Install Python, Basic Python Tools and GLUT
-RUN apt-get install -y python python-dev python-distribute python-pip python-wxgtk3.0 python-imaging python-mpmath
+# Python 3 and the GTK/OpenGL libraries wxPython needs at runtime
+RUN apt-get install -y python3 python3-dev python3-pip \
+        python3-wxgtk4.0 python3-mpmath python3-pil \
+        freeglut3-dev libgtk-3-0 libgl1 libglu1-mesa
 
-# OpenGL libs
-RUN apt-get install -y freeglut3 freeglut3-dev
-RUN pip install pyOpenGL pyOpenGL-accelerate
+RUN pip3 install --break-system-packages pyOpenGL pyOpenGL-accelerate
 
 # Copy the application folder inside the container
 ADD /. /cartographer
@@ -27,5 +28,4 @@ WORKDIR /cartographer
 ENV DISPLAY :0
 
 # Launch the application
-CMD python ./cartographer.py
-
+CMD ["python3", "./cartographer.py"]

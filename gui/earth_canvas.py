@@ -46,12 +46,18 @@ class EarthCanvas(GLCanvas):
         self.size = None
         self.view_distance = -15.0
         self.earth_radius = 2.0
-        self.standard_parallel1 = 15
-        self.standard_parallel2 = 15
+        # degrees; same defaults as the conic sliders and the conic projections
+        self.standard_parallel1 = 30
+        self.standard_parallel2 = 60
         self.draw_rays = True
+        self.earth_alpha = 70  # 0-100; below 100 the rays inside the earth show through
+        # 0.0-1.0, how much the furthest lines recede. Applied twice, once to
+        # colour via fog and once to alpha, so the strength that actually
+        # reaches the screen at the back is (1 - depth_cue) squared.
+        self.depth_cue = 0.85
         self.resolution = 1.0  # Default: low resolution (ranges from 0 to 7.5)
         self.ray_alpha = 50  # 0-100, will be converted to 0.0-1.0
-        self.cylinder_unwrap = 0
+        self.surface_unroll = 0
         self.earth_texture = None
         self.earth_quad = None
         self.plain_texture = None
@@ -159,6 +165,66 @@ class EarthCanvas(GLCanvas):
         else:
             return 'generic'
 
+    def _conic_cone_geometry(self):
+        """Geometry of the cone drawn for conic projections.
+
+        The cone is tangent to the sphere along the first standard parallel:
+        its apex sits at r / sin(phi) on the axis and it widens going down,
+        touching the sphere exactly on that parallel. Very high parallels give
+        an almost flat cone, so the cone is cut off before it grows wide
+        enough to swallow the whole view.
+
+        Returns (base_r, h, apex_z) in world coordinates.
+        """
+        r = self.earth_radius
+        phi = math.radians(max(5.0, min(85.0, self.standard_parallel1)))
+        apex_z = r / math.sin(phi)
+        # radius the cone surface gains per unit of descent below the apex
+        slope = (r * math.cos(phi)) / (apex_z - r * math.sin(phi))
+        h = min(apex_z + r, (r * 2.5) / slope)
+        return slope * h, h, apex_z
+
+    def _earth_rotate(self, x, y, z):
+        """Apply the earth's own rotation (earthx/y/z) to a point.
+
+        Matches the glRotatef order used to draw the sphere: Rx(earthy)
+        Rz(earthx) Ry(earthz). Shared by the ray/coastline sampling and the
+        pseudo-cylindrical graticule so they turn together.
+        """
+        ax = math.radians(self.earthy)
+        az = math.radians(self.earthx)
+        ay = math.radians(self.earthz)
+        cx, sx = math.cos(ax), math.sin(ax)
+        cz, sz = math.cos(az), math.sin(az)
+        cy, sy = math.cos(ay), math.sin(ay)
+        # Ry
+        x1 = cy * x + sy * z
+        y1 = y
+        z1 = -sy * x + cy * z
+        # Rz
+        x2 = cz * x1 - sz * y1
+        y2 = sz * x1 + cz * y1
+        z2 = z1
+        # Rx
+        return x2, cx * y2 - sx * z2, sx * y2 + cx * z2
+
+    def _pseudocyl_surface_point_geo(self, lon_deg, lat_deg):
+        """Flat-map point for a geographic lon/lat, after the earth's rotation.
+
+        Turns the geographic coordinate into the effective (world-space)
+        lon/lat the projection is actually evaluated at, exactly as the
+        coastline sampling and the 2D panel do, so the graticule drawn with
+        this deforms into the oblique aspect in step with the continents.
+        """
+        lon = math.radians(lon_deg)
+        lat = math.radians(lat_deg)
+        x, y, z = self._earth_rotate(math.cos(lat) * math.sin(lon),
+                                     -math.cos(lat) * math.cos(lon),
+                                     math.sin(lat))
+        lon_eff = math.degrees(math.atan2(x, -y))
+        lat_eff = math.degrees(math.asin(max(-1.0, min(1.0, z))))
+        return self._compute_pseudocylindrical_surface_point(lon_eff, lat_eff)
+
     def _compute_pseudocylindrical_surface_point(self, lon_deg, lat_deg):
         """Compute the 3D position on the projection surface for pseudo-cylindrical projections.
 
@@ -197,7 +263,9 @@ class EarthCanvas(GLCanvas):
 
         # The surface is positioned at y = -(r + offset)
         # This places it in front of the Earth (since camera typically views from -y direction)
-        offset = r * 0.5
+        # Pushed well clear of the sphere so it reads as a separate flat map the
+        # globe projects onto, rather than a net wrapped around it.
+        offset = r * 1.6
         z_depth = -(r + offset)
 
         # Map the 2D projection coordinates to this surface
@@ -241,19 +309,9 @@ class EarthCanvas(GLCanvas):
         glRotatef(self.posx, 0.0, 0.0, 1.0)
         glRotatef(self.posz, 0.0, 1.0, 0.0)
 
-        # Draw opaque earth sphere first with back-face culling
-        # so depth buffer is established and inner surface is never visible
+        # The earth is drawn last (see draw_earth), as translucent glass over
+        # the rays, so the rays reaching the centre stay visible through it.
         glEnable(GL_TEXTURE_2D)
-        glEnable(GL_CULL_FACE)
-        glCullFace(GL_BACK)
-        glPushMatrix()
-        glRotatef(self.earthy, 1.0, 0.0, 0.0)
-        glRotatef(self.earthx, 0.0, 0.0, 1.0)
-        glRotatef(self.earthz, 0.0, 1.0, 0.0)
-        glBindTexture(GL_TEXTURE_2D, self.earth_texture)
-        gluSphere(self.earth_quad, self.earth_radius, 32, 32)
-        glPopMatrix()
-        glDisable(GL_CULL_FACE)
 
         # Draw transparent projection surfaces with depth read but no depth write
         # so they appear in front of the sphere where appropriate but don't
@@ -274,6 +332,7 @@ class EarthCanvas(GLCanvas):
                     cyl_size = 6.0  # Fallback
             else:
                 cyl_size = 8  # Increased from 6 to 8 for more clearance for Mercator, Miller, etc.
+            cyl_size *= 0.9  # trimmed 10%: there was more headroom than the map needs
             glPushMatrix()
             # Keep cylinder fixed (vertical) - Earth rotates inside it
             # This shows what happens when different great circles become tangent to the cylinder
@@ -282,13 +341,13 @@ class EarthCanvas(GLCanvas):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
             glColor4f(1.0, 1.0, 1.0, 0.14)
             glBindTexture(GL_TEXTURE_2D, self.plain_texture)
-            if self.cylinder_unwrap == 0:
+            if self.surface_unroll == 0:
                 gluCylinder(self.plain_quad, self.earth_radius * 1.01, self.earth_radius * 1.01, self.earth_radius * cyl_size, 32, 64)
             else:
                 self.draw_cylinder_surface(cyl_size)
             glPopMatrix()
             # Draw "Projection" text at bottom of cylinder
-            if self.cylinder_unwrap == 0:
+            if self.surface_unroll == 0:
                 self.draw_cylinder_label(cyl_size)
             if self.draw_rays:
                 self.draw_shape_rays()
@@ -303,80 +362,69 @@ class EarthCanvas(GLCanvas):
         elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Conic:
             # Draw cone for conic projections
             r = self.earth_radius
-            base_r = r * self.standard_parallel1 / 10.0
-            h = r * 3.0
+            base_r, h, apex_z = self._conic_cone_geometry()
 
-            glPushMatrix()
-            glTranslatef(0.0, 0.0, -r)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
             glColor4f(1.0, 1.0, 1.0, 0.5)
             glBindTexture(GL_TEXTURE_2D, self.plain_texture)
-            gluCylinder(self.plain_quad, base_r, 0, h, 32, 64)
+            if self.surface_unroll == 0:
+                glPushMatrix()
+                glTranslatef(0.0, 0.0, apex_z - h)
+                gluCylinder(self.plain_quad, base_r, 0, h, 32, 64)
+                glPopMatrix()
+            else:
+                self.draw_cone_surface()
 
             # Draw standard parallels circles on the cone surface
             glDisable(GL_TEXTURE_2D)
             glLineWidth(2.0)
             glColor4f(1.0, 0.8, 0.2, 0.9)  # Orange/yellow for standard parallels
 
-            # Calculate z positions and radii for standard parallels
-            # Cone equation: radius = base_r * (1 - z/h)
+            # Draw each standard parallel where the cone surface crosses that
+            # latitude. On the first one the cone is tangent, so the circle
+            # sits exactly on the sphere. Drawn in world coordinates and put
+            # through the unroll, so they follow the cone as it flattens.
             projection = self.cartographer.projection_panel.projection
             if hasattr(projection, 'phi1') and hasattr(projection, 'phi2'):
-                phi1 = math.degrees(projection.phi1)
-                phi2 = math.degrees(projection.phi2)
-
-                # Map latitudes to z-positions on cone (approximation)
-                # Assuming equator is at z=h/2, poles at z=0 and z=h
-                z1 = h * (0.5 - phi1 / 180.0)
-                z2 = h * (0.5 - phi2 / 180.0)
-
-                # Calculate radii at these z-positions
-                if 0 <= z1 <= h:
-                    r1 = base_r * (1 - z1 / h)
-                    if r1 > 0:
-                        glBegin(GL_LINE_LOOP)
-                        for i in range(64):
-                            theta = 2.0 * math.pi * i / 64
-                            x = r1 * math.cos(theta)
-                            y = r1 * math.sin(theta)
-                            glVertex3f(x, y, z1)
-                        glEnd()
-
-                if 0 <= z2 <= h:
-                    r2 = base_r * (1 - z2 / h)
-                    if r2 > 0:
-                        glBegin(GL_LINE_LOOP)
-                        for i in range(64):
-                            theta = 2.0 * math.pi * i / 64
-                            x = r2 * math.cos(theta)
-                            y = r2 * math.sin(theta)
-                            glVertex3f(x, y, z2)
-                        glEnd()
+                slope = base_r / h
+                for phi in (projection.phi1, projection.phi2):
+                    world_z = r * math.sin(phi)
+                    circle_r = slope * (apex_z - world_z)
+                    if circle_r <= 0 or not (apex_z - h <= world_z <= apex_z):
+                        continue
+                    # a strip rather than a loop, so the cut stays open
+                    glBegin(GL_LINE_STRIP)
+                    for i in range(65):
+                        theta = -math.pi + 2.0 * math.pi * i / 64
+                        glVertex3f(*self._unroll_cone_point(
+                            circle_r * math.sin(theta),
+                            -circle_r * math.cos(theta), world_z))
+                    glEnd()
 
             # Draw apex point marker
             glColor4f(1.0, 1.0, 0.0, 1.0)
             glPointSize(8.0)
             glBegin(GL_POINTS)
-            glVertex3f(0, 0, h)
+            glVertex3f(*self._unroll_cone_point(0.0, 0.0, apex_z))
             glEnd()
             glPointSize(1.0)
 
             glEnable(GL_TEXTURE_2D)
             glLineWidth(1.0)
-            glPopMatrix()
-
-            # Draw label
-            self.draw_conic_label()
 
             if self.draw_rays:
                 self.draw_shape_rays()
             glDisable(GL_BLEND)
         elif self.cartographer.projection_panel.projection.projection_type == self.cartographer.projection_panel.projection.ProjectionType.Azimuthal:
-            # Draw tangent plane for azimuthal projections
+            # Draw the projection plane, tangent at the front of the globe (the
+            # equatorial/oblique aspect the 2D panel draws). The disk is built
+            # in its own xy-plane, then rotated to face -y and pushed out front.
+            self._az_scale = self._azimuthal_scale()
             glPushMatrix()
             disk_size = 3
-            glTranslatef(0.0, 0.0, -self.earth_radius)
+            glTranslatef(0.0, -self.earth_radius * self.AZ_PLANE_DIST, 0.0)
+            glRotatef(90, 1, 0, 0)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
             glColor4f(1.0, 1.0, 1.0, 0.5)
@@ -389,14 +437,18 @@ class EarthCanvas(GLCanvas):
             # Draw distance rings for azimuthal equidistant
             ray_type = self.get_azimuthal_ray_type()
             if ray_type == 'equidistant':
+                projection = self.cartographer.projection_panel.projection
                 glDisable(GL_TEXTURE_2D)
                 glColor4f(0.8, 0.8, 1.0, 0.3)  # Light blue for distance rings
                 glLineWidth(1.0)
-                # Draw rings at 30°, 60°, 90°, 120°, 150° intervals
+                # Rings at fixed angular distances from the centre, sized with
+                # the same scale as the map so they line up with the continents.
                 for angle_deg in [30, 60, 90, 120, 150]:
-                    angle_rad = math.radians(angle_deg)
-                    # For azimuthal equidistant, distance on map = R * angular distance
-                    ring_radius = self.earth_radius * angle_rad
+                    try:
+                        px, py = projection.get_coords(math.radians(angle_deg), 0.0)
+                    except (ValueError, ZeroDivisionError, OverflowError):
+                        continue
+                    ring_radius = math.hypot(px, py) * self._az_scale
                     glBegin(GL_LINE_LOOP)
                     for i in range(64):
                         theta = 2.0 * math.pi * i / 64
@@ -406,50 +458,44 @@ class EarthCanvas(GLCanvas):
                     glEnd()
                 glEnable(GL_TEXTURE_2D)
 
-            # Draw label showing projection type and ray origin
-            glDisable(GL_TEXTURE_2D)
-            glDisable(GL_BLEND)
-            glColor3f(1.0, 1.0, 1.0)
-
-            # Position label at edge of projection plane
-            label_x = self.earth_radius * 2.5
-            label_y = 0
-            label_z = 0
-
-            glPushMatrix()
-            glTranslatef(label_x, label_y, label_z)
-            glRotatef(90, 1, 0, 0)  # Rotate to be readable
-            glScalef(0.003, 0.003, 0.003)
-
-            ray_type = self.get_azimuthal_ray_type()
-            if ray_type == 'gnomonic':
-                label_text = b"Gnomonic (rays from center)"
-            elif ray_type == 'stereographic':
-                label_text = b"Stereographic (rays from opposite point)"
-            elif ray_type == 'orthographic':
-                label_text = b"Orthographic (parallel rays)"
-            elif ray_type == 'equidistant':
-                label_text = b"Azimuthal Equidistant"
-            else:
-                label_text = b"Azimuthal"
-
-            try:
-                glutStrokeString(GLUT_STROKE_ROMAN, label_text)
-            except:
-                pass  # GLUT not available
-
-            glPopMatrix()
-            glEnable(GL_TEXTURE_2D)
-            glEnable(GL_BLEND)
-
             glPopMatrix()
             if self.draw_rays:
                 self.draw_shape_rays()
             glDisable(GL_BLEND)
 
+        self.draw_earth()
+
         glDepthMask(GL_TRUE)
 
         self.SwapBuffers()
+
+    def draw_earth(self):
+        """Draw the earth sphere as translucent glass, on top of everything else.
+
+        It goes last and semi-transparent on purpose: the rays converge at the
+        centre of the earth, so drawing an opaque sphere first (or letting it
+        write depth) hides exactly the part of the picture that shows where the
+        projection starts. Back-face culling keeps it to a single layer.
+        """
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glDepthMask(GL_FALSE)
+        glColor4f(1.0, 1.0, 1.0, self.earth_alpha / 100.0)
+
+        glPushMatrix()
+        glRotatef(self.earthy, 1.0, 0.0, 0.0)
+        glRotatef(self.earthx, 0.0, 0.0, 1.0)
+        glRotatef(self.earthz, 0.0, 1.0, 0.0)
+        glBindTexture(GL_TEXTURE_2D, self.earth_texture)
+        gluSphere(self.earth_quad, self.earth_radius, 32, 32)
+        glPopMatrix()
+
+        glDisable(GL_CULL_FACE)
+        glDisable(GL_BLEND)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
 
     def _unwrap_point(self, x, y, z):
         """Transform a point on the circular cylinder to its unwrapped position.
@@ -462,10 +508,10 @@ class EarthCanvas(GLCanvas):
         - Finally becomes a flat horizontal line at y = r
         - The front point remains in contact with the earth throughout
         """
-        if self.cylinder_unwrap == 0:
+        if self.surface_unroll == 0:
             return (x, y, z)
 
-        f = self.cylinder_unwrap / 100.0
+        f = self.surface_unroll / 100.0
         # Use the actual input point's radius for start position
         input_r = math.sqrt(x * x + y * y)
         # Use earth_radius for the final unfolded width (circumference)
@@ -519,7 +565,7 @@ class EarthCanvas(GLCanvas):
         height = self.earth_radius * cyl_size
 
         # Gap at the cut edges - increases as the cylinder unwraps
-        unwrap_factor = self.cylinder_unwrap / 100.0
+        unwrap_factor = self.surface_unroll / 100.0
         eps = 0.001 + unwrap_factor * 0.5
 
         for j in range(n_stacks):
@@ -566,6 +612,18 @@ class EarthCanvas(GLCanvas):
         r = self.earth_radius * 1.01
         height = self.earth_radius * cyl_size
 
+        # Shade the markers and degree labels by distance, exactly as the rays
+        # and coastlines are: they ring the whole cylinder, so without it the
+        # ones on the far side read as brightly as the ones facing the viewer.
+        cue_axis = zx, zy, zz = self._eye_depth_axis()
+        cue_extent = r * math.hypot(zx, zy) + (height / 2.0) * abs(zz)
+        fogged = self._begin_depth_cue(cue_extent)
+
+        def fade(x, y, local_z):
+            """Depth fade for something drawn at this spot on the cylinder."""
+            return self._depth_fade((x, y, local_z - height / 2.0),
+                                    cue_axis, cue_extent)
+
         glPushMatrix()
         glTranslatef(0.0, 0.0, -height / 2)
 
@@ -574,7 +632,6 @@ class EarthCanvas(GLCanvas):
         glDisable(GL_LIGHTING)
 
         # Draw 8 short vertical lines evenly spaced around the cylinder
-        glColor4f(0.7, 0.7, 0.7, 0.4)  # Gray with constant opacity
         glLineWidth(2.0)
 
         line_length = 0.3  # Length of the short lines
@@ -586,12 +643,15 @@ class EarthCanvas(GLCanvas):
             y = r * math.sin(angle)
 
             # Line at bottom
+            glColor4f(0.7, 0.7, 0.7, 0.4 * fade(x, y, line_length / 2))
             glBegin(GL_LINES)
             glVertex3f(x, y, 0)
             glVertex3f(x, y, line_length)
             glEnd()
 
             # Line at top
+            glColor4f(0.7, 0.7, 0.7,
+                      0.4 * fade(x, y, height - line_length / 2))
             glBegin(GL_LINES)
             glVertex3f(x, y, height - line_length)
             glVertex3f(x, y, height)
@@ -601,7 +661,6 @@ class EarthCanvas(GLCanvas):
 
         # Draw longitude labels (0, 90, 180, 270) as if printed on cylinder surface
         # Using the coordinate system: x = r*sin(lon), y = -r*cos(lon)
-        glColor4f(0.3, 0.3, 0.3, 0.9)  # Dark gray with constant opacity
         glLineWidth(2.0)
 
         # Longitude positions: rotate by 270° from standard to put 0° at front
@@ -627,6 +686,7 @@ class EarthCanvas(GLCanvas):
             text_y = y
 
             # Draw at bottom
+            glColor4f(0.3, 0.3, 0.3, 0.9 * fade(text_x, text_y, text_z_offset_bottom))
             glPushMatrix()
             glTranslatef(text_x, text_y, text_z_offset_bottom)
             glRotatef(math.degrees(angle) + 90, 0, 0, 1)  # Rotate around cylinder
@@ -640,6 +700,8 @@ class EarthCanvas(GLCanvas):
             glPopMatrix()
 
             # Draw at top (further from base to avoid vertical bars)
+            glColor4f(0.3, 0.3, 0.3,
+                      0.9 * fade(text_x, text_y, height - text_z_offset_top))
             glPushMatrix()
             glTranslatef(text_x, text_y, height - text_z_offset_top)
             glRotatef(math.degrees(angle) + 90, 0, 0, 1)  # Rotate around cylinder
@@ -655,61 +717,76 @@ class EarthCanvas(GLCanvas):
 
         glPopMatrix()
 
+        if fogged:
+            glDisable(GL_FOG)
+
         # Re-enable textures
         glEnable(GL_TEXTURE_2D)
 
+    # How far in front of the globe the azimuthal projection plane sits, in
+    # earth radii. The plane is tangent to the front (equator point facing the
+    # viewer), giving the same equatorial/oblique aspect the 2D panel draws.
+    AZ_PLANE_DIST = 2.5
+
+    def _azimuthal_scale(self):
+        """Fixed scale mapping a projection's formula output onto the plane.
+
+        A single scale, like the 2D panel's fixed zoom, keeps every projection
+        at its own natural relative size, so the 3D map shows the same extent as
+        the 2D panel. The formula constants all top out near 170, which this
+        maps to about 2.5 earth radii (the disc that holds the map).
+        """
+        return self.earth_radius / 68.0
+
+    def _azimuthal_formula_xy(self, lon_deg, lat_deg):
+        """Where a point lands on the plane, from the projection's own 2D formula.
+
+        Uses the panel's exact convention - screen-x from -proj_x, up from
+        +proj_y, longitude taken the same way round - so the flat map is
+        identical to the 2D panel for every azimuthal projection, symmetric or
+        not (Weichel, unlike the others, is not symmetric in longitude).
+        """
+        projection = self.cartographer.projection_panel.projection
+        try:
+            proj_x, proj_y = projection.get_coords(math.radians(lon_deg),
+                                                   math.radians(lat_deg))
+        except (ValueError, ZeroDivisionError, OverflowError):
+            return None
+        if abs(proj_x) > 5000 or abs(proj_y) > 5000:
+            return None  # sentinel a formula returns for points it cannot show
+        s = self._az_scale
+        return (-proj_x * s, proj_y * s)
+
     def _compute_azimuthal_intersection(self, px, py, pz):
-        """Compute intersection with azimuthal plane using projection-specific ray origin.
-        px, py, pz: point on sphere surface
-        Returns (ix, iy, iz) on tangent plane or None
+        """Where a sphere point lands on the azimuthal projection plane.
+
+        Placed straight from the projection's own 2D formula, in the panel's
+        convention, so the flat map matches the 2D panel for every azimuthal
+        projection and for the whole world - both hemispheres, not just the
+        front. The plane is tangent at the front of the globe (the equatorial
+        aspect the 2D panel draws).
+
+        px, py, pz: rotated point on the sphere surface (radius = earth_radius).
+        Returns (ix, iy, iz) on the plane (y = -D) or None.
         """
         r = self.earth_radius
-        ray_type = self.get_azimuthal_ray_type()
-        plane_z = -r  # Tangent plane at south pole
+        plane_y = -r * self.AZ_PLANE_DIST
 
-        if ray_type == 'gnomonic':
-            # Rays from center (0, 0, 0)
-            if abs(pz) < 1e-9:
-                return None
-            t = plane_z / pz
-            if t < 0:  # Ray goes wrong direction
-                return None
-            ix, iy = px * t, py * t
+        radius = math.sqrt(px * px + py * py + pz * pz)
+        if radius < 1e-9:
+            return None
+        lon_eff = math.degrees(math.atan2(-px, -py))
+        lat_eff = math.degrees(math.asin(max(-1.0, min(1.0, pz / radius))))
+        proj = self._azimuthal_formula_xy(lon_eff, lat_eff)
+        if proj is None:
+            return None
+        ix, iz = proj
 
-        elif ray_type == 'stereographic':
-            # Rays from opposite point (north pole at 0, 0, r)
-            origin_z = r
-            dx, dy, dz = px, py, pz - origin_z
-            if abs(dz) < 1e-9:
-                return None
-            t = (plane_z - origin_z) / dz
-            if t < 0:
-                return None
-            ix = dx * t
-            iy = dy * t
-
-        elif ray_type == 'orthographic':
-            # Parallel rays from infinity, perpendicular to plane
-            # Simply project straight down onto the plane
-            ix, iy = px, py
-            # Check if point is on visible hemisphere
-            if pz > 0:  # Back side, not visible
-                return None
-
-        else:  # 'equidistant' or 'generic'
-            # Use rays from center (generic geometric)
-            if abs(pz) < 1e-9:
-                return None
-            t = plane_z / pz
-            if t < 0:
-                return None
-            ix, iy = px * t, py * t
-
-        # Check if within plane bounds
-        if ix * ix + iy * iy > (r * 3) ** 2:
+        # Keep the map on the plane (matches the 2D panel clipping at its edge)
+        if ix * ix + iz * iz > (r * 3.0) ** 2:
             return None
 
-        return (ix, iy, plane_z)
+        return (ix, plane_y, iz)
 
     def _intersect_ray(self, dx, dy, dz, proj_type, ProjectionType):
         """Compute intersection of a ray from origin with the projection surface.
@@ -728,9 +805,7 @@ class EarthCanvas(GLCanvas):
             return self._unwrap_point(ix, iy, iz)
 
         elif proj_type == ProjectionType.Conic:
-            base_r = r * self.standard_parallel1 / 10.0
-            h = r * 3.0
-            apex_z = -r + h
+            base_r, h, apex_z = self._conic_cone_geometry()
             k = base_r / h
             a_coeff = dx * dx + dy * dy - k * k * dz * dz
             b_coeff = 2.0 * k * k * apex_z * dz
@@ -772,14 +847,22 @@ class EarthCanvas(GLCanvas):
         Returns list of 3D points on the surface."""
         r = self.earth_radius
 
-        if proj_type == ProjectionType.Cylindrical or proj_type == ProjectionType.PseudoCylindrical:
+        if proj_type == ProjectionType.PseudoCylindrical:
+            # The pseudo-cylindrical map is a flat sheet, so two neighbouring
+            # points on it are joined by a straight segment. These points used
+            # to be forced through the cylinder path below, which bent the
+            # coastline onto a cylinder wrapped round the globe instead of
+            # leaving it lying flat on the map.
+            return [p1, p2]
+
+        if proj_type == ProjectionType.Cylindrical:
             cyl_r = r * 1.01  # Same as draw_cylinder_surface
             # When unwrapped, work backwards from unwrapped coords to get phi
             # phi is the angle from back (phi=0 at back/-y, phi=±pi at front/+y)
-            if self.cylinder_unwrap > 0:
+            if self.surface_unroll > 0:
                 # p1 and p2 are already unwrapped (from _intersect_ray)
                 # Recover phi using Newton's method
-                f = self.cylinder_unwrap / 100.0
+                f = self.surface_unroll / 100.0
                 # Must use the same smoothstep easing as _unwrap_point
                 smooth_f = f * f * (3 - 2 * f)
                 ur = r * 1.01
@@ -824,8 +907,10 @@ class EarthCanvas(GLCanvas):
                 dphi -= 2 * math.pi
             elif dphi < -math.pi:
                 dphi += 2 * math.pi
-            # Skip if wrapping around the front (cut at phi = ±pi)
-            if abs(dphi) > math.pi * 0.8:
+            # Skip segments that jump a long way round the cylinder: adjacent
+            # coastline samples never span this much longitude unless they wrap
+            # across the seam or round the pole, where the line would be spurious.
+            if abs(dphi) > math.pi * 0.5:
                 return []
             pts = []
             for s in range(steps + 1):
@@ -840,9 +925,13 @@ class EarthCanvas(GLCanvas):
             return pts
 
         elif proj_type == ProjectionType.Conic:
-            base_r = r * self.standard_parallel1 / 10.0
-            h = r * 3.0
-            apex_z = -r + h
+            if self.surface_unroll > 0:
+                # Once the cone is opening out the points are already unrolled,
+                # and the flattening surface is close enough to flat between two
+                # neighbouring samples that a straight segment sits on it.
+                return [p1, p2]
+
+            base_r, h, apex_z = self._conic_cone_geometry()
             k = base_r / h
             # Convert to conical coordinates: angle around axis and height z
             theta1 = math.atan2(p1[1], p1[0])
@@ -854,7 +943,8 @@ class EarthCanvas(GLCanvas):
                 dtheta -= 2 * math.pi
             elif dtheta < -math.pi:
                 dtheta += 2 * math.pi
-            if abs(dtheta) > math.pi * 0.8:
+            # Skip segments that jump a long way round the cone (see cylinder).
+            if abs(dtheta) > math.pi * 0.5:
                 return []
             pts = []
             for s in range(steps + 1):
@@ -871,144 +961,302 @@ class EarthCanvas(GLCanvas):
 
         return []
 
-    def _get_mercator_cylinder_point(self, lon_deg, lat_deg):
-        """Calculate where a point at given lat/lon should appear on the cylinder using Mercator formula.
+    def _get_cylinder_point(self, lon_deg, lat_deg):
+        """Where a lat/lon lands on the cylinder, using the projection's own formula.
 
-        Returns (x, y, z) on the cylinder surface where:
-        - x, y define the position around the cylinder (from longitude)
-        - z is the height using Mercator formula: r * asinh(tan(lat))
+        The height comes from the 2D projection object itself, divided by that
+        projection's own longitude scale and multiplied by the cylinder radius.
+        One radian of longitude is exactly one radius around the circumference,
+        so that reproduces whatever aspect ratio the projection panel draws,
+        for any cylindrical projection.
+
+        Asking the projection rather than reimplementing its formula here is
+        what stops the two panels drifting apart. Miller had no case of its own
+        and fell through to a plain geometric ray/cylinder hit, which is the
+        central cylindrical projection: it runs away as tan(lat) and came out
+        far taller than the Miller map next to it.
         """
         r = self.earth_radius
         cyl_r = r * 1.01  # Same radius as cylinder
 
         lon = math.radians(lon_deg)
-        lat = math.radians(lat_deg)
 
         # Position around cylinder (from longitude)
         # Match the coordinate system: negative sin for x, negative cos for y
         x = cyl_r * math.sin(lon)
         y = -cyl_r * math.cos(lon)
 
-        # Height using Mercator formula: z = r * asinh(tan(lat))
-        # This naturally scales to fill the cylinder which extends from -r*3 to +r*3
-        # asinh(tan(lat)) ranges from about -3 to +3 for latitudes up to ±85°
-        if abs(lat) < math.pi/2 - 0.01:  # Avoid poles
-            z = r * math.asinh(math.tan(lat))
-        else:
-            # At poles, use a large value with appropriate sign
-            z = math.copysign(r * 2.5, lat)
+        # Stay off the poles, where every cylindrical formula runs to infinity
+        lat = math.radians(max(-89.0, min(89.0, lat_deg)))
 
-        return (x, y, z)
-
-    def _get_equal_area_cylinder_point(self, lon_deg, lat_deg):
-        """Calculate where a point at given lat/lon should appear on the cylinder using Equal Area formula.
-
-        Returns (x, y, z) on the cylinder surface where:
-        - x, y define the position around the cylinder (from longitude)
-        - z is the height using Equal Area formula: r * sin(lat) / cos(standard_latitude)
-        """
-        r = self.earth_radius
-        cyl_r = r * 1.01  # Same radius as cylinder
-
-        lon = math.radians(lon_deg)
-        lat = math.radians(lat_deg)
-
-        # Position around cylinder (from longitude)
-        # Match the coordinate system: negative sin for x, negative cos for y
-        x = cyl_r * math.sin(lon)
-        y = -cyl_r * math.cos(lon)
-
-        # Get the standard latitude from the Equal Area projection
         projection = self.cartographer.projection_panel.projection
-        if hasattr(projection, 'cos_standard_latitude'):
-            cos_std_lat = projection.cos_standard_latitude
-        else:
-            cos_std_lat = 1.0  # Fallback if not available
+        try:
+            lon_scale = projection.get_coords(1.0, 0.0)[0]  # units per radian
+            height = projection.get_coords(0.0, lat)[1]
+        except (ValueError, OverflowError, ZeroDivisionError):
+            return (x, y, 0.0)
 
-        # Height using Equal Area formula: z = r * sin(lat) / cos(standard_latitude)
-        # Scale to match the 2D projection's vertical extent
-        # The 2D uses 90 * sin(lat) / cos(std_lat), so we scale proportionally
-        z = r * 1.5 * math.sin(lat) / cos_std_lat
+        if not lon_scale:
+            return (x, y, 0.0)
 
-        return (x, y, z)
+        z = cyl_r * height / lon_scale
+        # Keep the map on the cylinder even if a formula still runs away
+        limit = r * 3.5
+        return (x, y, max(-limit, min(limit, z)))
 
-    def _generate_mercator_ray(self, sphere_pt, mercator_pt, lat_deg, steps=20):
-        """Generate a ray from Earth's center through surface, curving to Mercator point.
+    def draw_cone_surface(self):
+        """Draw the cone as a mesh, so it can be shown part way through unrolling.
 
-        The ray shows:
-        - Center to surface: straight radial line (hidden inside Earth)
-        - Surface to cylinder: smooth curve to Mercator-corrected position
+        gluCylinder can only draw the closed cone; once the cut opens the
+        surface has to be built by hand, the same way the cylinder does it.
+        """
+        base_r, h, apex_z = self._conic_cone_geometry()
+        alpha = math.atan2(base_r, h)
+        sin_a, cos_a = math.sin(alpha), math.cos(alpha)
+        if cos_a < 1e-9:
+            return
 
-        The curvature amount visualizes Mercator distortion:
-        - Equator: nearly straight (minimal distortion)
-        - Higher latitudes: more curve (more distortion)
+        s_max = h / cos_a  # slant distance from apex to the rim
+        n_slices = 64
+        n_stacks = 24
+        # gap at the cut edges, widening as the cone opens
+        eps = 0.001 + (self.surface_unroll / 100.0) * 0.02
+        span = 2.0 * math.pi - 2.0 * eps
+
+        def vertex(s, theta, tex_s, tex_t):
+            axis_r = s * sin_a
+            glTexCoord2f(tex_s, tex_t)
+            glVertex3f(*self._unroll_cone_point(axis_r * math.sin(theta),
+                                                -axis_r * math.cos(theta),
+                                                apex_z - s * cos_a))
+
+        for j in range(n_stacks):
+            s0 = s_max * j / float(n_stacks)
+            s1 = s_max * (j + 1) / float(n_stacks)
+            glBegin(GL_QUAD_STRIP)
+            for i in range(n_slices + 1):
+                frac = i / float(n_slices)
+                theta = -math.pi + eps + frac * span
+                vertex(s0, theta, frac, j / float(n_stacks))
+                vertex(s1, theta, frac, (j + 1) / float(n_stacks))
+            glEnd()
+
+    def _unroll_cone_point(self, x, y, z):
+        """Transform a point on the cone to its unrolled position.
+
+        A cone flattens isometrically into a circular sector. A point at slant
+        distance s from the apex stays at distance s from the sector's apex,
+        but its angle round the axis shrinks by sin(half angle): the circle of
+        circumference 2*pi*s*sin(a) has to open out into an arc of radius s,
+        which only spans 2*pi*sin(a). That factor is what makes the flattened
+        cone a fan rather than a full disc, and it is the whole reason a conic
+        map has a wedge missing.
+
+        Like the cylinder, the cut opens at the front, the back stays put, and
+        the flattened surface finishes behind the earth. Unlike the cylinder,
+        z moves too: the cone's slant becomes radius in the flat sector.
+        """
+        if self.surface_unroll == 0:
+            return (x, y, z)
+
+        base_r, h, apex_z = self._conic_cone_geometry()
+        alpha = math.atan2(base_r, h)
+        sin_a, cos_a = math.sin(alpha), math.cos(alpha)
+        if cos_a < 1e-9:
+            return (x, y, z)
+
+        # slant distance from the apex, and angle round the axis measured from
+        # the back so the cut lands at the front, as the cylinder does
+        s = (apex_z - z) / cos_a
+        phi = math.atan2(-x, -y)
+
+        # the sector: same distance from the apex, angle scaled by sin(alpha)
+        theta = phi * sin_a
+        end_x = -s * math.sin(theta)
+        end_y = -self.earth_radius
+        end_z = apex_z - s * math.cos(theta)
+
+        f = self.surface_unroll / 100.0
+        smooth_f = f * f * (3 - 2 * f)
+        return ((1 - smooth_f) * x + smooth_f * end_x,
+                (1 - smooth_f) * y + smooth_f * end_y,
+                (1 - smooth_f) * z + smooth_f * end_z)
+
+    def _get_cone_point(self, lon_deg, lat_deg):
+        """Where a lat/lon lands on the cone, using the projection's own formula.
+
+        A conic projection is polar about the cone's apex: it puts a point at
+        some radius from the apex, at an angle proportional to longitude.
+        Wrapping that back onto the drawn cone means reading that radius and
+        turning it into a slant distance from the apex. Only the scale is
+        unknown, and the standard parallel fixes it: there the cone touches the
+        sphere, so that one distance has to come out exactly right.
+
+        This replaces a geometric ray/cone intersection that had two problems.
+        It produced an identical picture for Lambert and Albers, since it never
+        consulted either formula; and a ray from the centre of a sphere misses
+        a finite cone entirely for much of the globe, so everything below about
+        35S was silently dropped.
+
+        Returns None past the end of the drawn cone, where conic projections
+        run away towards the far pole.
+        """
+        projection = self.cartographer.projection_panel.projection
+        n = getattr(projection, 'n', None)
+        if not n:
+            return None
+
+        base_r, h, apex_z = self._conic_cone_geometry()
+        alpha = math.atan2(base_r, h)  # half angle of the cone as drawn
+        sin_a, cos_a = math.sin(alpha), math.cos(alpha)
+        if cos_a < 1e-9:
+            return None
+
+        r = self.earth_radius
+        phi_c = math.radians(max(5.0, min(85.0, self.standard_parallel1)))
+        # slant distance from apex to the parallel where the cone touches
+        s_tangent = (apex_z - r * math.sin(phi_c)) / cos_a
+
+        def apex_radius(lat_rad):
+            # Sample a quarter turn around the cone. There the projection's own
+            # radius appears undiluted in x, and any constant offset it adds to
+            # y (Albers has one, for centring) drops out.
+            return abs(projection.get_coords(math.pi / (2.0 * n), lat_rad)[0])
+
+        try:
+            rho_ref = apex_radius(phi_c)
+            rho = apex_radius(math.radians(max(-89.0, min(89.0, lat_deg))))
+        except (ValueError, OverflowError, ZeroDivisionError):
+            return None
+        if rho_ref <= 1e-9:
+            return None
+
+        s = s_tangent * rho / rho_ref
+        if s < 0.0 or s > h / cos_a:
+            return None  # beyond the drawn cone
+
+        axis_r = s * sin_a
+        lon = math.radians(lon_deg)
+        return self._unroll_cone_point(axis_r * math.sin(lon),
+                                       -axis_r * math.cos(lon),
+                                       apex_z - s * cos_a)
+
+    def _generate_ray(self, sphere_pt, target_pt, steps=20):
+        """Generate a ray from the earth's centre to a point on a projection surface.
+
+        The ray is radial and straight from the centre out to the sphere
+        surface, and from there a quadratic Bezier bends towards the target.
+        The Bezier's control point sits on the radial line, so the curve leaves
+        the surface travelling in exactly the direction the radial part arrived
+        in: the two meet smoothly instead of at a visible angle.
+
+        The bend is not decoration. Projections like Mercator are not
+        geometric: a straight ray out of the centre reaches the cylinder at
+        r*tan(lat), while Mercator puts the point at r*asinh(tan(lat)). Past
+        60 degrees those differ by more than an earth radius, so the ray has to
+        turn to land in the right place, and how hard it turns is exactly how
+        far the projection departs from a straight-line one.
         """
         sx, sy, sz = sphere_pt
-        mx, my, mz = mercator_pt
+        tx, ty, tz = target_pt
 
-        points = [(0, 0, 0)]  # Start from Earth's center
+        s_len = math.sqrt(sx * sx + sy * sy + sz * sz)
+        if s_len < 1e-9:
+            return [(0.0, 0.0, 0.0), (tx, ty, tz)]
+        ux, uy, uz = sx / s_len, sy / s_len, sz / s_len
 
-        for i in range(1, steps + 1):
-            t = i / float(steps)
+        # Control point: keep going radially for half of however far the target
+        # lies outwards. Using the outward part only keeps the curve from
+        # bulging back out past the surface when the target sits below it.
+        radial_gap = (tx - sx) * ux + (ty - sy) * uy + (tz - sz) * uz
+        k = max(0.0, radial_gap) * 0.5
+        cx, cy, cz = sx + k * ux, sy + k * uy, sz + k * uz
 
-            if t <= 0.5:
-                # From center to sphere surface: straight radial line (INSIDE Earth)
-                # This portion is hidden by depth buffer
-                scale = t * 2.0
-                x, y, z = scale * sx, scale * sy, scale * sz
-            else:
-                # From surface to Mercator point: smooth curve (VISIBLE)
-                t_curve = (t - 0.5) * 2.0  # 0 to 1 for curve segment
+        inner = max(1, steps // 2)
+        outer = max(1, steps - inner)
 
-                # Smooth easing using smoothstep
-                smooth = t_curve * t_curve * (3 - 2 * t_curve)
-
-                x = sx + smooth * (mx - sx)
-                y = sy + smooth * (my - sy)
-                z = sz + smooth * (mz - sz)
-
-            points.append((x, y, z))
-
+        points = [(0.0, 0.0, 0.0)]
+        for i in range(1, inner + 1):  # centre -> surface, straight and radial
+            f = i / float(inner)
+            points.append((f * sx, f * sy, f * sz))
+        for i in range(1, outer + 1):  # surface -> target, quadratic Bezier
+            t = i / float(outer)
+            a = (1.0 - t) * (1.0 - t)
+            b = 2.0 * (1.0 - t) * t
+            c = t * t
+            points.append((a * sx + b * cx + c * tx,
+                           a * sy + b * cy + c * ty,
+                           a * sz + b * cz + c * tz))
         return points
 
-    def _generate_equal_area_ray(self, sphere_pt, equal_area_pt, lat_deg, steps=20):
-        """Generate a ray from Earth's center through surface, curving to Equal Area point.
+    def _begin_depth_cue(self, extent):
+        """Fade rays and projected coastlines towards the background with distance.
 
-        The ray shows:
-        - Center to surface: straight radial line (hidden inside Earth)
-        - Surface to cylinder: smooth curve to Equal Area-corrected position
+        Rays and coastlines wrap all the way around the sphere, so the far half
+        of the picture lands on top of the near half on screen. With every line
+        drawn at the same brightness the two are impossible to separate and the
+        shape of the projection is lost. Linear fog in the background colour
+        dims by eye distance, which reads as depth.
 
-        Equal Area has less vertical distortion than Mercator:
-        - Height adjustment is proportional to sin(lat) rather than asinh(tan(lat))
-        - Less extreme curvature at high latitudes
+        Args:
+            extent: how far the drawn geometry reaches towards and away from
+                the viewer, in world units. The fog ramp is fitted to exactly
+                this span; making it wider leaves every line bunched in the
+                middle of the ramp and the effect barely shows.
+
+        The ramp is placed so the nearest geometry keeps its full brightness
+        and the furthest loses `depth_cue` of it, and it is rebuilt from the
+        current view distance each frame so the cue survives zooming.
         """
-        sx, sy, sz = sphere_pt
-        ex, ey, ez = equal_area_pt
+        if self.depth_cue <= 0.0 or extent <= 1e-6:
+            return False
 
-        points = [(0, 0, 0)]  # Start from Earth's center
+        dist = abs(self.view_distance)
+        d = min(0.99, self.depth_cue)
+        glFogi(GL_FOG_MODE, GL_LINEAR)
+        glFogfv(GL_FOG_COLOR, [0.0, 0.0, 0.0, 1.0])
+        glFogf(GL_FOG_START, dist - extent)
+        glFogf(GL_FOG_END, dist + extent * (2.0 - d) / d)
+        glEnable(GL_FOG)
+        return True
 
-        for i in range(1, steps + 1):
-            t = i / float(steps)
+    def _eye_depth_axis(self):
+        """The world-space direction that becomes eye-space depth, from the modelview.
 
-            if t <= 0.5:
-                # From center to sphere surface: straight radial line (INSIDE Earth)
-                # This portion is hidden by depth buffer
-                scale = t * 2.0
-                x, y, z = scale * sx, scale * sy, scale * sz
-            else:
-                # From surface to Equal Area point: smooth curve (VISIBLE)
-                t_curve = (t - 0.5) * 2.0  # 0 to 1 for curve segment
+        The depth cue has to know how far the geometry really reaches towards
+        and away from the viewer, and that depends on how the view is turned:
+        the cylinder spans only its radius in depth seen from the side, but its
+        whole length seen end-on. Reading the axis off the matrix keeps the cue
+        correct at any rotation instead of assuming one particular view.
+        """
+        mv = glGetFloatv(GL_MODELVIEW_MATRIX)
+        # eye z of a world point is zx*x + zy*y + zz*z + constant (column-major)
+        return float(mv[0][2]), float(mv[1][2]), float(mv[2][2])
 
-                # Smooth easing using smoothstep
-                smooth = t_curve * t_curve * (3 - 2 * t_curve)
+    def _points_depth_extent(self, points):
+        """How far world-space points reach either side of the centre, in depth."""
+        zx, zy, zz = self._eye_depth_axis()
+        extent = 0.0
+        for px, py, pz in points:
+            extent = max(extent, abs(zx * px + zy * py + zz * pz))
+        return extent
 
-                x = sx + smooth * (ex - sx)
-                y = sy + smooth * (ey - sy)
-                z = sz + smooth * (ez - sz)
+    def _depth_fade(self, point, axis, extent):
+        """How much of its strength a line at this point keeps, 1 nearest to 1-depth_cue furthest.
 
-            points.append((x, y, z))
-
-        return points
+        Fog on its own only darkens, and a darkened line drawn over the pale
+        cylinder just turns into a dark line: still high contrast, so the far
+        side refuses to recede however hard the fog is pushed. Fading the alpha
+        as well lets distant geometry dissolve into whatever sits behind it,
+        which is what actually reads as distance.
+        """
+        if self.depth_cue <= 0.0 or extent <= 1e-6:
+            return 1.0
+        zx, zy, zz = axis
+        # positive is towards the viewer, since eye z grows towards the eye
+        towards = zx * point[0] + zy * point[1] + zz * point[2]
+        far = (extent - towards) / (2.0 * extent)  # 0 nearest, 1 furthest
+        return 1.0 - self.depth_cue * min(1.0, max(0.0, far))
 
     def draw_shape_rays(self):
         r = self.earth_radius
@@ -1019,29 +1267,7 @@ class EarthCanvas(GLCanvas):
         # Use shapes selected from Resolution menu (synced with 2D panel)
         shapes = self.opengl_shapes
 
-        # Build rotation matrix matching glRotatef order: Rx(earthy) Rz(earthx) Ry(earthz)
-        ax = math.radians(self.earthy)
-        az = math.radians(self.earthx)
-        ay = math.radians(self.earthz)
-        cx, sx = math.cos(ax), math.sin(ax)
-        cz, sz = math.cos(az), math.sin(az)
-        cy, sy = math.cos(ay), math.sin(ay)
-
-        # Rx * Rz * Ry combined rotation matrix
-        def rotate(x, y, z):
-            # Ry first
-            x1 = cy * x + sy * z
-            y1 = y
-            z1 = -sy * x + cy * z
-            # Rz
-            x2 = cz * x1 - sz * y1
-            y2 = sz * x1 + cz * y1
-            z2 = z1
-            # Rx
-            x3 = x2
-            y3 = cx * y2 - sx * z2
-            z3 = sx * y2 + cx * z2
-            return x3, y3, z3
+        rotate = self._earth_rotate
 
         def sphere_point(lon_deg, lat_deg):
             lon = math.radians(lon_deg)
@@ -1058,21 +1284,23 @@ class EarthCanvas(GLCanvas):
             dx, dy, dz = px / length, py / length, pz / length
             return self._intersect_ray(dx, dy, dz, proj_type, ProjectionType)
 
-        # Check if this is a Mercator-type cylindrical projection
-        is_mercator = (proj_type == ProjectionType.Cylindrical and
-                      hasattr(projection, '__class__') and
-                      'Mercator' in projection.__class__.__name__)
+        # Every cylindrical projection is placed from its own formula, rather
+        # than only the two that used to be recognised by class name. Anything
+        # not matched fell through to a geometric ray/cylinder hit, which is a
+        # different projection entirely and did not match the 2D panel.
+        is_cylindrical = (proj_type == ProjectionType.Cylindrical)
+        is_conic = (proj_type == ProjectionType.Conic)
+        is_azimuthal = (proj_type == ProjectionType.Azimuthal)
 
-        # Check if this is an Equal Area cylindrical projection
-        is_equal_area = (proj_type == ProjectionType.Cylindrical and
-                        hasattr(projection, '__class__') and
-                        'EqualArea' in projection.__class__.__name__)
+        # Normalising scale for the azimuthal formula-based projections, so the
+        # flat map matches the 2D panel's shape at a sensible on-screen size.
+        if is_azimuthal:
+            self._az_scale = self._azimuthal_scale()
 
         # Collect sampled points (flat list for rays/dots) and
         # part-aware intersection lists (for outlines)
         all_intersections = []
         all_sphere_points = []
-        all_latlon = []  # Store original lat/lon for Mercator calculation
         part_intersections = []  # list of lists, one per contiguous part
 
         count = 0
@@ -1100,7 +1328,7 @@ class EarthCanvas(GLCanvas):
                     px, py, pz = sphere_point(lon_deg, lat_deg)
 
                     # Calculate projection surface intersection point
-                    if is_mercator or is_equal_area:
+                    if is_cylindrical:
                         # Calculate effective lat/lon with respect to the FIXED vertical cylinder
                         # After Earth rotation, we need the coordinates in world space
                         sphere_radius = math.sqrt(px*px + py*py + pz*pz)
@@ -1115,11 +1343,8 @@ class EarthCanvas(GLCanvas):
                             lat_eff_deg = math.degrees(lat_eff)
                             lon_eff_deg = math.degrees(lon_eff)
 
-                            # Use effective lat/lon for the appropriate projection
-                            if is_mercator:
-                                mx, my, mz = self._get_mercator_cylinder_point(lon_eff_deg, lat_eff_deg)
-                            else:  # is_equal_area
-                                mx, my, mz = self._get_equal_area_cylinder_point(lon_eff_deg, lat_eff_deg)
+                            # Use effective lat/lon with the projection's own formula
+                            mx, my, mz = self._get_cylinder_point(lon_eff_deg, lat_eff_deg)
                             # Apply cylinder unwrap transformation
                             hit = self._unwrap_point(mx, my, mz)
 
@@ -1127,20 +1352,37 @@ class EarthCanvas(GLCanvas):
                                 all_intersections.append(hit)
                                 all_sphere_points.append((px, py, pz))
                                 # Store effective lat/lon for ray curvature calculation
-                                all_latlon.append((lon_eff_deg, lat_eff_deg))
                                 part_hits.append(hit)
                         else:
                             hit = None
+                    elif is_conic:
+                        # The cone is fixed while the earth turns inside it, so
+                        # the point has to be placed by its world-space lat/lon
+                        sphere_radius = math.sqrt(px * px + py * py + pz * pz)
+                        if sphere_radius > 1e-9:
+                            lat_eff = math.asin(pz / sphere_radius)
+                            lon_eff = math.atan2(px, -py)
+                            hit = self._get_cone_point(math.degrees(lon_eff),
+                                                       math.degrees(lat_eff))
+                            if hit is not None:
+                                all_intersections.append(hit)
+                                all_sphere_points.append((px, py, pz))
+                                part_hits.append(hit)
                     elif proj_type == ProjectionType.PseudoCylindrical:
-                        # Pseudo-cylindrical projections use mathematical formulas
-                        # Show them as deformed surfaces based on the projection formula
-                        hit = self._compute_pseudocylindrical_surface_point(lon_deg, lat_deg)
-
-                        if hit is not None:
-                            all_intersections.append(hit)
-                            all_sphere_points.append((px, py, pz))
-                            all_latlon.append((lon_deg, lat_deg))
-                            part_hits.append(hit)
+                        # Use the rotated (effective) lat/lon, exactly as the
+                        # cylindrical and conic cases do, so the continents on
+                        # the flat map move and deform as the earth turns and
+                        # match what the 2D panel draws.
+                        sphere_radius = math.sqrt(px * px + py * py + pz * pz)
+                        if sphere_radius > 1e-9:
+                            lat_eff = math.asin(pz / sphere_radius)
+                            lon_eff = math.atan2(px, -py)
+                            hit = self._compute_pseudocylindrical_surface_point(
+                                math.degrees(lon_eff), math.degrees(lat_eff))
+                            if hit is not None:
+                                all_intersections.append(hit)
+                                all_sphere_points.append((px, py, pz))
+                                part_hits.append(hit)
                     else:
                         # Use geometric projection for other types
                         # Special handling for azimuthal projections with different ray origins
@@ -1152,7 +1394,6 @@ class EarthCanvas(GLCanvas):
                         if hit is not None:
                             all_intersections.append(hit)
                             all_sphere_points.append((px, py, pz))
-                            all_latlon.append((lon_deg, lat_deg))
                             part_hits.append(hit)
                 if len(part_hits) >= 2:
                     part_intersections.append(part_hits)
@@ -1163,83 +1404,77 @@ class EarthCanvas(GLCanvas):
         # Disable texture for drawing lines (rays and outlines)
         glDisable(GL_TEXTURE_2D)
 
+        # Shade both the rays and the projected coastlines by distance: fog
+        # darkens them, and the per-line alpha fade below makes them recede
+        cue_axis = self._eye_depth_axis()
+        cue_extent = self._points_depth_extent(all_intersections)
+        fogged = self._begin_depth_cue(cue_extent)
+
         # Only draw rays and dots when cylinder is fully closed (not unfolding)
         # During unfolding, the 3D projection concept doesn't apply
-        if self.cylinder_unwrap == 0:
+        if self.surface_unroll == 0:
             # Draw rays showing how projection works
             # Depth testing is enabled, so Earth will hide the interior portions
             glLineWidth(1.0)
             ray_alpha = self.ray_alpha / 100.0  # Convert 0-100 slider to 0.0-1.0
-            glColor4f(0.0, 0.0, 0.7, ray_alpha)
+            # Normal alpha blending here: with the additive blending used for the
+            # solids, overlapping rays pile up channel by channel and wash out to
+            # white, which hides the colour completely where the rays are dense.
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
             for i, (ix, iy, iz) in enumerate(all_intersections):
                 sphere_pt = all_sphere_points[i]
+                # Light blue, faded by how far away this ray lands
+                glColor4f(0.45, 0.65, 1.0,
+                          ray_alpha * self._depth_fade((ix, iy, iz), cue_axis, cue_extent))
 
-                if is_mercator:
-                    # Draw ray from center through surface to Mercator cylinder point
-                    # Curvature depends on latitude (straight at equator, curved at poles)
-                    lon_deg, lat_deg = all_latlon[i]
-                    ray_points = self._generate_mercator_ray(sphere_pt, (ix, iy, iz), lat_deg, steps=20)
-                    glBegin(GL_LINE_STRIP)
-                    for px, py, pz in ray_points:
-                        glVertex3f(px, py, pz)
-                    glEnd()
-                elif is_equal_area:
-                    # Draw ray from center through surface to Equal Area cylinder point
-                    # Less curvature than Mercator (sin vs asinh(tan))
-                    lon_deg, lat_deg = all_latlon[i]
-                    ray_points = self._generate_equal_area_ray(sphere_pt, (ix, iy, iz), lat_deg, steps=20)
+                if is_cylindrical or is_conic:
+                    # Ray from the centre out to where the projection puts the
+                    # point on the cylinder or cone; how far it bends is how far
+                    # the projection departs from a straight-line one
+                    ray_points = self._generate_ray(sphere_pt, (ix, iy, iz), steps=20)
                     glBegin(GL_LINE_STRIP)
                     for px, py, pz in ray_points:
                         glVertex3f(px, py, pz)
                     glEnd()
                 elif proj_type == ProjectionType.PseudoCylindrical:
-                    # Draw curved ray from sphere surface to projection surface
-                    # showing the mathematical transformation
-                    sphere_pt = all_sphere_points[i]
-                    # Draw smooth curve from sphere surface to projection point
-                    glBegin(GL_LINE_STRIP)
-                    steps = 15
-                    for step in range(steps + 1):
-                        t = step / float(steps)
-                        # Smoothstep easing for nice curve
-                        smooth_t = t * t * (3 - 2 * t)
-                        # Interpolate from sphere surface to projection surface
-                        px = sphere_pt[0] * (1 - smooth_t) + ix * smooth_t
-                        py = sphere_pt[1] * (1 - smooth_t) + iy * smooth_t
-                        pz = sphere_pt[2] * (1 - smooth_t) + iz * smooth_t
-                        glVertex3f(px, py, pz)
+                    # A straight correspondence line joining the point on the
+                    # globe to where it lands on the flat map. There is no
+                    # surface to project onto for these projections, so the old
+                    # curved ray implied a geometry that does not exist; a
+                    # straight "this point goes there" line is the honest story.
+                    # Only drawn for the hemisphere facing the map (py < 0), so
+                    # the lines reach the map without cutting back through the
+                    # globe.
+                    if sphere_pt[1] < 0:
+                        glBegin(GL_LINES)
+                        glVertex3f(*sphere_pt)
+                        glVertex3f(ix, iy, iz)
+                        glEnd()
+                elif proj_type == ProjectionType.Azimuthal:
+                    # Correspondence line from the globe point to where it lands
+                    # on the map, for every point so nothing is left unconnected.
+                    # Back-hemisphere lines pass through the translucent globe.
+                    glBegin(GL_LINES)
+                    glVertex3f(*sphere_pt)
+                    glVertex3f(ix, iy, iz)
                     glEnd()
                 else:
-                    # Draw rays for other projections
-                    if proj_type == ProjectionType.Azimuthal:
-                        # Different ray origins for different azimuthal projections
-                        ray_type = self.get_azimuthal_ray_type()
-                        glBegin(GL_LINES)
+                    # Draw straight ray from center for other projections
+                    glBegin(GL_LINES)
+                    glVertex3f(0, 0, 0)
+                    glVertex3f(ix, iy, iz)
+                    glEnd()
 
-                        if ray_type == 'stereographic':
-                            # Ray from opposite point (north pole)
-                            glVertex3f(0, 0, r)
-                        elif ray_type == 'orthographic':
-                            # Parallel ray from "infinity" - show as starting above the projection
-                            # Start from a point directly above the final position
-                            glVertex3f(ix, iy, iz + 3 * r)
-                        else:  # gnomonic, equidistant, generic
-                            # Ray from center
-                            glVertex3f(0, 0, 0)
-
-                        glVertex3f(ix, iy, iz)
-                        glEnd()
-                    else:
-                        # Draw straight ray from center for conic and other projections
-                        glBegin(GL_LINES)
-                        glVertex3f(0, 0, 0)
-                        glVertex3f(ix, iy, iz)
-                        glEnd()
-
-        # Draw continent outlines on projection surface
+        # Draw continent outlines on projection surface.
+        # These write depth (unlike everything else here) so the translucent
+        # earth, drawn afterwards, is depth-rejected wherever a coastline sits
+        # in front of it - otherwise the earth paints over the near-side
+        # projected continents and hides them. Rays keep writing no depth, so
+        # the earth still shows through as glass over them.
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glLineWidth(2.0)
+        glDepthMask(GL_TRUE)
 
         import math as m
 
@@ -1247,31 +1482,52 @@ class EarthCanvas(GLCanvas):
 
         for part_hits in part_intersections:
             for j in range(len(part_hits) - 1):
-                # Check if we're unfolding and if points are on opposite sides of the gap
-                if self.cylinder_unwrap > 0:
-                    p1 = part_hits[j]
-                    p2 = part_hits[j + 1]
-                    # Calculate angles around cylinder for both points
-                    theta1 = m.atan2(p1[1], p1[0])
-                    theta2 = m.atan2(p2[1], p2[0])
-                    # Calculate angular distance (accounting for wraparound)
-                    angle_diff = abs(theta2 - theta1)
-                    if angle_diff > m.pi:
-                        angle_diff = 2 * m.pi - angle_diff
-                    # If points are far apart angularly (> 90°), they're on opposite sides of gap
-                    # Skip drawing this segment to avoid lines crossing the gap
-                    if angle_diff > m.pi / 2:
-                        continue
+                # Drop coastline segments that jump across the surface: adjacent
+                # samples that wrap over the back seam, or round the effective
+                # pole where longitude spins. Left in, they draw a long line
+                # straight across the map connecting two unrelated points.
+                a, b = part_hits[j], part_hits[j + 1]
+                skip = False
+                if self.surface_unroll > 0 and proj_type == ProjectionType.Conic:
+                    # Opened cone: every point sits at nearly the same y, so the
+                    # jump shows up as a big straight-line distance across the fan.
+                    skip = m.dist(a, b) > r * 1.5
+                elif self.surface_unroll > 0:
+                    # Opening cylinder: measure the angle round the axis.
+                    ad = abs(m.atan2(a[1], a[0]) - m.atan2(b[1], b[0]))
+                    if ad > m.pi:
+                        ad = 2 * m.pi - ad
+                    skip = ad > m.pi / 2
+                elif proj_type == ProjectionType.PseudoCylindrical:
+                    # Flat map: the antimeridian jump spans the map width in x.
+                    skip = abs(a[0] - b[0]) > r * 1.5
+                elif proj_type in (ProjectionType.Cylindrical, ProjectionType.Conic):
+                    # Wrapped cylinder / cone: a seam or pole jump is a big step
+                    # AROUND the axis, i.e. a big horizontal (xy) distance. Using
+                    # only the horizontal part keeps a tall map's legitimate
+                    # vertical stretch (Mercator near the poles) from being cut.
+                    skip = m.hypot(a[0] - b[0], a[1] - b[1]) > r * 1.2
+                elif proj_type == ProjectionType.Azimuthal:
+                    # Flat disc: skip a straight segment that leaps across it.
+                    skip = m.dist(a, b) > r * 1.5
+                if skip:
+                    continue
 
                 seg = self._interpolate_on_surface(
                     part_hits[j], part_hits[j + 1], proj_type, ProjectionType)
                 if len(seg) >= 2:
+                    mid = seg[len(seg) // 2]
                     glBegin(GL_LINE_STRIP)
-                    glColor4f(0.0, 1.0, 1.0, 0.8)  # Constant alpha - no brightness variation
+                    glColor4f(0.0, 1.0, 1.0,
+                              0.8 * self._depth_fade(mid, cue_axis, cue_extent))
                     for sx, sy, sz in seg:
                         glVertex3f(sx, sy, sz)
                     glEnd()
 
+        if fogged:
+            glDisable(GL_FOG)
+
+        glDepthMask(GL_FALSE)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glEnable(GL_TEXTURE_2D)
 
@@ -1318,10 +1574,6 @@ class EarthCanvas(GLCanvas):
 
             self.Refresh()
 
-    def set_standard_parallels(self, value1, value2):
-        self.standard_parallel1 = value1
-        self.standard_parallel2 = value2
-
     def draw_pseudocylindrical_surface(self):
         """Draw the characteristic surface shape for pseudo-cylindrical projections.
 
@@ -1342,6 +1594,11 @@ class EarthCanvas(GLCanvas):
         lat_steps = 20
         lon_steps = 36
 
+        # The graticule turns with the earth (the geographic grid drawn in the
+        # oblique aspect), matching the 2D panel. A segment that jumps across
+        # the antimeridian spans most of the map, so skip those.
+        max_step = r * 1.5
+
         glBegin(GL_LINES)
 
         # Draw meridians (longitude lines)
@@ -1350,8 +1607,9 @@ class EarthCanvas(GLCanvas):
             prev_pt = None
             for i_lat in range(lat_steps + 1):
                 lat_deg = -90 + i_lat * 180.0 / lat_steps
-                pt = self._compute_pseudocylindrical_surface_point(lon_deg, lat_deg)
-                if pt is not None and prev_pt is not None:
+                pt = self._pseudocyl_surface_point_geo(lon_deg, lat_deg)
+                if pt is not None and prev_pt is not None and \
+                        abs(pt[0] - prev_pt[0]) < max_step:
                     glVertex3f(prev_pt[0], prev_pt[1], prev_pt[2])
                     glVertex3f(pt[0], pt[1], pt[2])
                 prev_pt = pt
@@ -1362,52 +1620,32 @@ class EarthCanvas(GLCanvas):
             prev_pt = None
             for i_lon in range(lon_steps + 1):
                 lon_deg = -180 + i_lon * 360.0 / lon_steps
-                pt = self._compute_pseudocylindrical_surface_point(lon_deg, lat_deg)
-                if pt is not None and prev_pt is not None:
+                pt = self._pseudocyl_surface_point_geo(lon_deg, lat_deg)
+                if pt is not None and prev_pt is not None and \
+                        abs(pt[0] - prev_pt[0]) < max_step:
                     glVertex3f(prev_pt[0], prev_pt[1], prev_pt[2])
                     glVertex3f(pt[0], pt[1], pt[2])
                 prev_pt = pt
 
         glEnd()
 
-        # Draw outline showing characteristic shape
+        # Outline the map boundary - the +/-180 meridians traced pole to pole -
+        # so the characteristic silhouette reads at a glance: pointed poles for
+        # Sinusoidal, an ellipse for Mollweide, a diamond for Collignon.
         glColor4f(1.0, 1.0, 1.0, 0.6)
         glLineWidth(2.0)
         glBegin(GL_LINE_LOOP)
-        # Draw the equator outline (characteristic shape)
-        for i in range(lon_steps):
-            lon_deg = -180 + i * 360.0 / lon_steps
-            pt = self._compute_pseudocylindrical_surface_point(lon_deg, 0)  # Equator
+        for i_lat in range(lat_steps + 1):
+            lat_deg = -90 + i_lat * 180.0 / lat_steps
+            pt = self._compute_pseudocylindrical_surface_point(-180, lat_deg)
             if pt is not None:
-                glVertex3f(pt[0], pt[1], pt[2])
+                glVertex3f(*pt)
+        for i_lat in range(lat_steps + 1):
+            lat_deg = 90 - i_lat * 180.0 / lat_steps
+            pt = self._compute_pseudocylindrical_surface_point(180, lat_deg)
+            if pt is not None:
+                glVertex3f(*pt)
         glEnd()
-
-        # Draw label showing projection type
-        glColor3f(1.0, 1.0, 1.0)
-        label_offset = r * 0.3
-        glPushMatrix()
-        # Position label next to the surface
-        glTranslatef(r * 2.5, -(r + r * 0.5), r * 2)
-        glRotatef(90, 1, 0, 0)
-        glScalef(0.003, 0.003, 0.003)
-
-        if proj_type == 'sinusoidal':
-            label_text = b"Sinusoidal (pointed poles)"
-        elif proj_type == 'mollweide':
-            label_text = b"Mollweide (elliptical)"
-        elif proj_type == 'eckert4':
-            label_text = b"Eckert IV (compromise)"
-        elif proj_type == 'collignon':
-            label_text = b"Collignon (diamond shape)"
-        else:
-            label_text = b"Pseudo-cylindrical"
-
-        try:
-            glutStrokeString(GLUT_STROKE_ROMAN, label_text)
-        except:
-            pass  # GLUT not available
-
-        glPopMatrix()
 
         glEnable(GL_TEXTURE_2D)
         glLineWidth(1.0)
@@ -1417,58 +1655,12 @@ class EarthCanvas(GLCanvas):
 
         Args:
             phi1, phi2: Standard parallel values in degrees
+
+        Kept in degrees: the cone drawing code scales them to earth radii
+        where it needs them, so don't pre-scale here.
         """
-        self.standard_parallel1 = phi1 / 10.0
-        self.standard_parallel2 = phi2 / 10.0
-
-    def draw_conic_label(self):
-        """Draw label for conic projections showing projection type and standard parallels."""
-        r = self.earth_radius
-        conic_type = self.get_conic_type()
-        projection = self.cartographer.projection_panel.projection
-
-        glDisable(GL_TEXTURE_2D)
-        glDisable(GL_BLEND)
-        glColor3f(1.0, 1.0, 1.0)
-
-        # Position label to the side of the cone
-        label_x = r * 2.5
-        label_y = 0
-        label_z = r * 1.5
-
-        glPushMatrix()
-        glTranslatef(label_x, label_y, label_z)
-        glRotatef(90, 1, 0, 0)
-        glScalef(0.003, 0.003, 0.003)
-
-        # Get standard parallels for label
-        if hasattr(projection, 'phi1') and hasattr(projection, 'phi2'):
-            phi1_deg = int(math.degrees(projection.phi1))
-            phi2_deg = int(math.degrees(projection.phi2))
-
-            if conic_type == 'lambert':
-                label_text = f"Lambert Conformal Conic\nStd Parallels: {phi1_deg}°, {phi2_deg}°".encode()
-            elif conic_type == 'albers':
-                label_text = f"Albers Equal Area Conic\nStd Parallels: {phi1_deg}°, {phi2_deg}°".encode()
-            else:
-                label_text = f"Conic Projection\nStd Parallels: {phi1_deg}°, {phi2_deg}°".encode()
-        else:
-            label_text = b"Conic Projection"
-
-        try:
-            # Split multi-line text
-            lines = label_text.split(b'\n')
-            for i, line in enumerate(lines):
-                glPushMatrix()
-                glTranslatef(0, -i * 150, 0)  # Move down for each line
-                glutStrokeString(GLUT_STROKE_ROMAN, line)
-                glPopMatrix()
-        except:
-            pass  # GLUT not available
-
-        glPopMatrix()
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
+        self.standard_parallel1 = phi1
+        self.standard_parallel2 = phi2
 
     def draw_circle(self, y, radius, smoothness):
         mp = 2 * math.pi / smoothness

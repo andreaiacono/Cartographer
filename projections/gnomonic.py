@@ -4,29 +4,18 @@ from projections.generic import GenericProjection
 
 
 class GnomonicProjection(GenericProjection):
+    """Equatorial gnomonic, tangent at (lon 0, lat 0).
+
+    Every great circle projects to a straight line. Only the hemisphere within
+    90 degrees of the centre can be shown; beyond that the projection runs to
+    infinity, so those points are dropped.
+    """
 
     def __init__(self):
         self.projection_type = self.ProjectionType.Azimuthal
-        self.central_x = 0
-        self.central_y = 0
-        self.depth = 40
 
     def get_coords(self, x, y):
-        if abs(x - self.central_x / 360) > 1.7:
-            return 0, 0
-        cosx = math.cos(x)
-        cosy = math.cos(y)
-        sinx = math.sin(x)
-        siny = math.sin(y)
-        cos_c = cosy * cosx
-        val_x = (cosy * sinx) / cos_c
-        val_y = siny / cos_c
-
-        return int(max(-500, min(val_x * self.depth, 500))), int(max(-500, min(val_y * self.depth, 500)))
-
-    def set_distance(self, value):
-        self.depth = value
-
-    def set_central_point(self, x, y):
-        self.central_x = x
-        self.central_y = y
+        cos_c = math.cos(y) * math.cos(x)
+        if cos_c <= 0.03:
+            return -10000, -10000
+        return 40 * math.cos(y) * math.sin(x) / cos_c, 40 * math.sin(y) / cos_c

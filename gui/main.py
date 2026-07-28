@@ -1,7 +1,6 @@
 import wx
 import sys
 import os
-import math
 
 # Add parent directory to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,19 +8,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Get project root directory for absolute paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-import earth_canvas_params
+from gui import earth_canvas_params
 from gui.projections_configs import dynamic_config
-import earth_canvas
-import projection_panel
+from gui import earth_canvas
+from gui import projection_panel
 from projections import (mercator, equal_area, miller, sinusoidal, eckertIV,
                         collignon, mollweide, lambert, albers, orthographic,
                         equidistant, stereographic, gnomonic, aitoff, weichel)
 import lib.shapefile
-import options_window
+from gui import options_window
 
 class CartographerFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, parent=None, title="Cartographer", size=wx.Size(1000, 600))
+
+        # Application / window icon
+        icon_path = os.path.join(PROJECT_ROOT, "img", "icon.png")
+        if os.path.exists(icon_path):
+            self.SetIcon(wx.Icon(icon_path, wx.BITMAP_TYPE_PNG))
 
         self.Bind(wx.EVT_CLOSE, self.OnQuit)
 
@@ -50,7 +54,11 @@ class CartographerFrame(wx.Frame):
             "Africa": (10, 0, 0),
             "Asia": (85, 41, 0),
             "Oceania": (130, 0, 330),
-            "Antarctica": (120, 0, 280)
+            "Antarctica": (120, 0, 280),
+            # North Pole at the centre with the Greenwich meridian pointing
+            # straight down: the orientation of the United Nations flag when
+            # drawn with the (stereographic / azimuthal) polar projection.
+            "North Pole": (0, 0, 90)
         }
         self.id_zones = {}
 
@@ -172,6 +180,8 @@ class CartographerFrame(wx.Frame):
 
         # Create earth canvas params panel (bottom of right column)
         self.sliders_panel = earth_canvas_params.EarthCanvasParams(right_splitter, self)
+        # Match the controls to the projection selected at startup
+        self.sliders_panel.set_projection(self.projection_panel.projection)
 
         # Split right column into earth (top) and sliders (bottom)
         right_splitter.SplitHorizontally(earth_panel_container, self.sliders_panel)
@@ -309,6 +319,8 @@ class CartographerFrame(wx.Frame):
 
                 # Update params panel to show appropriate controls
                 self.params_panel.set_projection(proj_object)
+                # and the earth panel sliders, which differ per surface type
+                self.sliders_panel.set_projection(proj_object)
 
                 # Update window title
                 self.SetTitle("Cartographer - " + name.replace('&', '') + " projection")
@@ -353,101 +365,27 @@ class CartographerFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             filepath = dlg.GetPath()
 
-            # Add extension if not present
+            # Add extension if not present, following the filter the user picked
             if not filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
-                filepath += '.png'
+                filepath += '.jpg' if dlg.GetFilterIndex() == 1 else '.png'
 
             # Save the current projection panel's content
             # Get the projection panel's current size
             panel_width, panel_height = self.projection_panel.GetSize()
 
-            # Create a bitmap and draw the projection
+            # Create a bitmap and draw the projection with the very same code
+            # the panel uses on screen, so the export always matches the view
             bmp = wx.Bitmap(panel_width, panel_height)
             dc = wx.MemoryDC(bmp)
+            self.projection_panel.render(dc)
 
-            # Draw the projection (trigger the same OnPaint logic)
-            self.projection_panel._cache_rotation_matrix()
-            dc.SetBackground(wx.Brush("white"))
-            dc.Clear()
-
-            # Draw grid if enabled
-            if self.projection_panel.paint_grid or self.projection_panel.paint_grid_specials:
-                self.projection_panel.draw_grid(dc)
-
-            # Draw shapes
-            if self.projection_panel.shapes and self.projection_panel.projection:
-                self.projection_panel.projection.set_central_point(
-                    self.projection_panel.rotationx,
-                    self.projection_panel.rotationy
-                )
-                # Use the same drawing code from test_projection_panel
-                dc.SetPen(wx.Pen(self.projection_panel.shapes_color, 1))
-                width_third = panel_width / 3
-                height_third = panel_height / 3
-
-                for shape in self.projection_panel.shapes:
-                    points = shape.points
-                    if len(points) < 2:
-                        continue
-
-                    step = max(1, int(self.projection_panel.resolution))
-                    lines = []
-                    current_line = []
-                    prev_x = None
-                    prev_y = None
-
-                    for i in range(0, len(points), step):
-                        lon, lat = points[i]
-                        try:
-                            lon_rad = math.radians(-lon)
-                            lat_rad = math.radians(lat)
-                            cos_lat = math.cos(lat_rad)
-                            sx = cos_lat * math.cos(lon_rad)
-                            sy = cos_lat * math.sin(lon_rad)
-                            sz = math.sin(lat_rad)
-
-                            px = self.projection_panel._rot_a * sx + self.projection_panel._rot_b * sy + self.projection_panel._rot_c * sz
-                            py = self.projection_panel._rot_d * sx + self.projection_panel._rot_e * sy + self.projection_panel._rot_f * sz
-                            pz = self.projection_panel._rot_g * sx + self.projection_panel._rot_h * sy + self.projection_panel._rot_i * sz
-
-                            lat_eff = math.asin(math.radians(pz))
-                            lon_eff = math.atan2(math.radians(py), math.radians(px))
-                            proj_x, proj_y = self.projection_panel.projection.get_coords(-lon_eff, -lat_eff * 90)
-
-                            x = int(proj_x * self.projection_panel.mf + self.projection_panel.tx)
-                            y = int(proj_y * self.projection_panel.mf + self.projection_panel.ty)
-
-                            if prev_x is not None:
-                                dx = x - prev_x
-                                dy = y - prev_y
-                                if abs(dx) < width_third and abs(dy) < height_third:
-                                    current_line.append((x, y))
-                                else:
-                                    if len(current_line) > 1:
-                                        lines.append(current_line)
-                                    current_line = [(x, y)]
-                            else:
-                                current_line.append((x, y))
-
-                            prev_x = x
-                            prev_y = y
-                        except:
-                            if len(current_line) > 1:
-                                lines.append(current_line)
-                            current_line = []
-                            prev_x = None
-                            prev_y = None
-
-                    if len(current_line) > 1:
-                        lines.append(current_line)
-
-                    for line in lines:
-                        if len(line) > 1:
-                            dc.DrawLines(line)
-
-            # Save the bitmap
+            # Save the bitmap in the format the chosen extension asks for
             dc.SelectObject(wx.NullBitmap)
-            bmp.SaveFile(filepath, wx.BITMAP_TYPE_PNG)
+            if filepath.lower().endswith(('.jpg', '.jpeg')):
+                image_type = wx.BITMAP_TYPE_JPEG
+            else:
+                image_type = wx.BITMAP_TYPE_PNG
+            bmp.SaveFile(filepath, image_type)
             wx.MessageBox(f"Projection exported to {filepath}", "Export Complete", wx.OK | wx.ICON_INFORMATION)
         dlg.Destroy()
 
