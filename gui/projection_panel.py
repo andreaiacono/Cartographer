@@ -365,17 +365,17 @@ class ProjectionPanel(wx.Panel):
             self.last_mouse_y = y
 
             if self.is_dragging:
-                # Left button: rotate X and Y axes
+                # Left button: horizontal drag -> X axis, vertical drag -> Z axis (roll)
                 self.rotationx -= dx * 0.5  # horizontal drag affects X (left/right)
-                self.rotationy += dy * 0.5  # vertical drag affects Y (up/down)
+                self.rotationz += dy * 0.5  # vertical drag affects Z (roll)
                 # Keep angles in reasonable range
-                self.rotationy = self.rotationy % 360
+                self.rotationz = self.rotationz % 360
                 self.rotationx = max(-90, min(90, self.rotationx))
 
             elif self.is_right_dragging:
-                # Right button: rotate Z axis (roll)
-                self.rotationz -= dx * 0.5  # Match left drag sign
-                self.rotationz = self.rotationz % 360
+                # Right button: rotate Y axis (up/down spin)
+                self.rotationy -= dx * 0.5  # Match left drag sign
+                self.rotationy = self.rotationy % 360
 
             # Update cartographer's rotation values (syncs with earth panel)
             if self.cartographer:
